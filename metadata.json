@@ -1,0 +1,6 @@
+{
+  "name": "DÖVME TASARIM ASİSTANI",
+  "description": "Danışan analiz verileri, Batı / Tropical astroloji ve global harita altyapısıyla kişiye özel dövme tasarım konsepti ve tarifi hazırlama çalışma ortamı.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
