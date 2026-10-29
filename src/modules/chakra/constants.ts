@@ -2,8 +2,17 @@ import { ChakraName } from '../../types/analysis';
 import { ChakraDefinition } from './types';
 
 /**
- * 7 Temel Çakra Tanımları ve Numerolojik Rezonans Sözlüğü
- * Numeroloji modülünden gelen titreşimleri 7 ana çakra merkezine eşler.
+ * Pisagor Sayı Arketipi & Elementel Çakra Rezonansı Sentezi
+ * (Uygulamanın kullandığı elementel ve sayı arketipi sentezi; Standart Pisagor klasik çakra tablosu değildir)
+ * 
+ * Eşleştirme Tablosu:
+ * - ROOT (Kök)          → [4, 22]
+ * - SACRAL (Sakral)      → [2]
+ * - SOLAR_PLEXUS (Mide)  → [1, 8]
+ * - HEART (Kalp)         → [6, 33]
+ * - THROAT (Boğaz)       → [3, 5]
+ * - THIRD_EYE (3. Göz)   → [7, 11]
+ * - CROWN (Tepe / Taç)   → [9]
  */
 export const CHAKRA_DEFINITIONS: Record<ChakraName, ChakraDefinition> = {
   ROOT: {

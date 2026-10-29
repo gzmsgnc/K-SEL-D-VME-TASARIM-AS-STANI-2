@@ -53,7 +53,8 @@ export function getLetterValue(rawChar: string): number | null {
 export function isVowel(rawChar: string): boolean {
   if (!rawChar) return false;
   const upper = rawChar.toLocaleUpperCase('tr-TR');
-  return VOWEL_SET.has(upper);
+  const mapped = TURKISH_CHAR_MAP[upper] || upper;
+  return VOWEL_SET.has(upper) || VOWEL_SET.has(mapped);
 }
 
 /**

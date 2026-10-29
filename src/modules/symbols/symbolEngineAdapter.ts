@@ -102,7 +102,7 @@ export function getClientRecommendedSymbols(
   if (!client || !archive) return [];
 
   const analysisRecord = archive.analyses.find((a) => a.clientId === client.id);
-  const clientTests = archive.testResults.filter((t) => t.clientId === client.id);
+  const clientTests = (archive.testResults || []).filter((t) => t.clientId === client.id);
 
   return recommendSymbolsForClient({
     numerology: analysisRecord?.numerology || null,

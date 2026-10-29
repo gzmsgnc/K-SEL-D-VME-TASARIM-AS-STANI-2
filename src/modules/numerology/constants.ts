@@ -43,6 +43,12 @@ export const TURKISH_CHAR_MAP: Record<string, string> = {
   ş: 'S',
   Ü: 'U',
   ü: 'U',
+  Â: 'A',
+  â: 'A',
+  Î: 'I',
+  î: 'I',
+  Û: 'U',
+  û: 'U',
 };
 
 /**

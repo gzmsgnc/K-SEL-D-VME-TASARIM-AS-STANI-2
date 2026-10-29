@@ -3,7 +3,7 @@ import { ClientArchiveRecord } from '../types/archive';
 import { ChakraName } from '../types/analysis';
 import { TestQuestionAnswer } from '../types/test';
 import { TROPICAL_ZODIAC_SIGNS, CELESTIAL_BODIES_TR } from '../modules/astrology';
-import { calculateChakraAnalysisFromNumerology, CHAKRA_DEFINITIONS } from '../modules/chakra';
+import { CHAKRA_DEFINITIONS } from '../modules/chakra';
 import { TOTEM_ANIMALS, ENNEAGRAM_QUESTIONS, TOTEM_QUESTIONS } from '../modules/tests';
 import { NUMBER_RESONANCE_TABLE } from '../modules/numerology';
 import { ZodiacSign } from '../types/astrology';
@@ -319,9 +319,10 @@ export function getChakraCardData(
   const domDef = dominantChakraKey ? CHAKRA_DEFINITIONS[dominantChakraKey] : undefined;
   
   // 2. Destek Çakraları: score <= 4 olan çakralar arasındaki EN DÜŞÜK puana sahip TÜM çakralar (eşit puanlar dahil)
+  // dominantChakra hiçbir koşulda destek çakraları içine dahil edilemez.
   let minScore = 11;
   for (const c of chakra.chakras) {
-    if (c.score <= 4 && c.score < minScore) {
+    if (c.chakra !== dominantChakraKey && c.score <= 4 && c.score < minScore) {
       minScore = c.score;
     }
   }
@@ -329,14 +330,16 @@ export function getChakraCardData(
   let computedDeficits: ChakraName[] = [];
   if (minScore <= 4) {
     computedDeficits = chakra.chakras
-      .filter((c) => c.score === minScore)
+      .filter((c) => c.chakra !== dominantChakraKey && c.score === minScore)
       .map((c) => c.chakra);
   }
 
-  // Tüm eşit destek çakralarını kesin olarak topla (eski primaryDeficit tekil kalmışsa bile computedDeficits ile tamamla)
-  const rawDeficits: ChakraName[] = (chakra.deficitChakras && chakra.deficitChakras.length >= computedDeficits.length)
-    ? chakra.deficitChakras
-    : (computedDeficits.length > 0 ? computedDeficits : (chakra.primaryDeficit ? [chakra.primaryDeficit] : []));
+  // Tüm eşit destek çakralarını kesin olarak topla (dominantChakra hariç tutulur)
+  const rawDeficits: ChakraName[] = (
+    chakra.deficitChakras && chakra.deficitChakras.length >= computedDeficits.length
+      ? chakra.deficitChakras
+      : (computedDeficits.length > 0 ? computedDeficits : (chakra.primaryDeficit ? [chakra.primaryDeficit] : []))
+  ).filter((c) => c !== dominantChakraKey);
 
   const deficitDefs = rawDeficits.map((c) => CHAKRA_DEFINITIONS[c]).filter(Boolean);
   const defDef = deficitDefs.length > 0

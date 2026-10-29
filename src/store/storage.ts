@@ -7,7 +7,6 @@ import { ClientTattooReport } from '../types/report';
 import { ClientArchiveRecord } from '../types/archive';
 import { TropicalNatalChart } from '../types/astrology';
 import { generateId } from '../utils/id';
-import { calculateChakraAnalysisFromNumerology } from '../modules/chakra';
 
 export const STORAGE_KEYS = {
   CLIENTS: 'dovme_asistani_clients_v1',

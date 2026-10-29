@@ -3,12 +3,14 @@ import { NumerologyAnalysis } from '../../types/analysis';
 import { CHAKRA_DEFINITIONS, CHAKRA_ORDER } from './constants';
 
 /**
- * Numeroloji analiz çıktılarından 7 temel çakranın enerji dengesini,
+ * Pisagor Sayı Arketipi & Elementel Çakra Rezonansı Sentezi
+ * (Standart Pisagor'un klasik çakra tablosu olarak değil; sayı arketipi ve elementel rezonans sentezidir)
+ * 
+ * Numeroloji analiz çıktılarından (NumerologyAnalysis) 7 temel çakranın enerji dengesini,
  * skorlarını, baskın ve destek ihtiyacı olan çakralarını hesaplar.
  * 
  * Sorumluluk ilkesi:
- * Numeroloji hesaplamasını baştan yapmaz; A12'de hesaplanmış ve doğrulanmış
- * NumerologyAnalysis matrisini girdi olarak kabul eder.
+ * Numeroloji hesaplamasını asla baştan yapmaz; doğrudan NumerologyAnalysis çıktısını girdi olarak kabul eder.
  */
 export function calculateChakraAnalysisFromNumerology(
   numerology: NumerologyAnalysis
@@ -121,17 +123,20 @@ export function calculateChakraAnalysisFromNumerology(
   // Destek Gereken Çakraları (deficitChakras) ve Öncelikli Çakrayı (primaryDeficit) Belirle:
   // Kural: Yalnızca s.score <= 4 olan (BLOCKED veya UNDERACTIVE - Destek İhtiyacı / Blokaj) çakralar.
   // Bu çakralar arasındaki en düşük puana sahip TÜM çakralar (eşit puanlar dahil) tespit edilir.
-  // Eğer hiçbir çakra 4 veya altında değilse (tümü dengeli/açık), destek çakrası bulunmaz.
+  // Eğer hiçbir çakra 4 veya altında değilse (tümü dengeli/açık), destek çakrası bulunmaz ([]).
+  // KURAL: dominantChakra hiçbir koşulda deficitChakras içine alınamaz.
   let minScore = 11;
   for (const s of states) {
-    if (s.score <= 4 && s.score < minScore) {
+    if (s.chakra !== dominantChakra && s.score <= 4 && s.score < minScore) {
       minScore = s.score;
     }
   }
 
   let deficitChakras: ChakraName[] = [];
   if (minScore <= 4) {
-    deficitChakras = states.filter((s) => s.score === minScore).map((s) => s.chakra);
+    deficitChakras = states
+      .filter((s) => s.chakra !== dominantChakra && s.score === minScore)
+      .map((s) => s.chakra);
   }
 
   const primaryDeficit = deficitChakras.length > 0 ? deficitChakras[0] : undefined;
