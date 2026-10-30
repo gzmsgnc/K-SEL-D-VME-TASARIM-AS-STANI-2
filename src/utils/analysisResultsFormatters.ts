@@ -553,7 +553,7 @@ export function formatAstrologyCopyText(
     `=== BATI / TROPICAL ASTROLOJİ ANALİZİ ===`,
     `Danışan: ${client.firstName} ${client.lastName} (ID: ${client.id})`,
     `Kayıt Tarihi: ${data.calculatedAt ? new Date(data.calculatedAt).toLocaleString('tr-TR') : 'Kayıtlı'}`,
-    `Sistem: Tropical Zodyak / Placidus Ev Sistemi`,
+    `Sistem: Tropical (Batı) Zodyak`,
     ``,
     `Güneş Burcu: ${data.sunSignTr || '-'}`,
     `Ay Burcu: ${data.moonSignTr || '-'}`,

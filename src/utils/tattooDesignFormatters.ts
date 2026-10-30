@@ -60,10 +60,115 @@ export function formatDesignPreviewSummary(params: DesignPreviewParams): string 
 }
 
 /**
- * 1. Dövme Reçetesi Metni
+ * 1. Dövme Reçetesi & Kapsamlı Tasarım Raporu Metni (A57)
  */
 export function formatTattooRecipeText(client: Client, design: ClientTattooDesign): string {
   const r = design.recipe;
+  const rep = r.comprehensiveReport;
+
+  if (rep) {
+    const lines: string[] = [
+      `=== DÖVME REÇETESİ VE KAPSAMLI TASARIM RAPORU (V${design.versionNumber}) ===`,
+      `Danışan: ${client.firstName} ${client.lastName} (${client.id})`,
+      `Tasarım Başlığı: ${design.title}`,
+      `Oluşturulma Tarihi: ${new Date(design.createdAt).toLocaleDateString('tr-TR')}`,
+      '',
+      `[A. DANIŞAN VE REÇETE ÖZETİ] [STİL VE YERLEŞİM]`,
+      `• Danışan: ${rep.sectionA.clientSummary}`,
+      `• Danışan Kimliği: ${rep.sectionA.clientId}`,
+      `• Reçete Sürümü: V${rep.sectionA.recipeVersion}`,
+      `• Tasarım Başlığı: ${rep.sectionA.title}`,
+      `• Stil: ${rep.sectionA.styleTr}`,
+      `• Yerleşim: ${rep.sectionA.placementTr} (${rep.sectionA.placementDetailTr})`,
+      `• Önerilen Ölçüler: ${rep.sectionA.recommendedDimensions}`,
+      rep.sectionA.customDimensions ? `• Danışan Özel Ölçüsü: ${rep.sectionA.customDimensions}` : '',
+      rep.sectionA.dimensionWarningTr ? `• ÖLÇÜ UYARISI: ${rep.sectionA.dimensionWarningTr}` : '',
+      `• Renk Profili: ${rep.sectionA.colorProfileTr}`,
+      rep.sectionA.colorRationaleTr ? `• Renk Gerekçesi: ${rep.sectionA.colorRationaleTr}` : '',
+      `• Ana Sembol: ${r.primarySymbol}`,
+      `• İkincil Semboller: ${(r.secondarySymbols || []).join(', ')}`,
+      `• Tamamlanan Analizler (${rep.sectionA.completedModules.length}): ${rep.sectionA.completedModules.join(', ')}`,
+      `• Eksik / Tamamlanmamış Modüller (${rep.sectionA.missingModules.length}): ${rep.sectionA.missingModules.join(', ')}`,
+      `• Aktif Analiz Sonuçları Özeti:`,
+      ...(rep.sectionA.activeAnalysisModulesSummary || rep.sectionA.completedModules || []).map((s) => `  - ${s}`),
+      '',
+      `[B. KİŞİSEL ANALİZDEN TASARIMA GEÇİŞ]`,
+      `• Analiz Veri Kaynakları:`,
+      ...rep.sectionB.originAnalysesSummary.map((s) => `  - ${s}`),
+      `• Tasarıma Aktarılan Tematik Anahtarlar: ${rep.sectionB.thematicKeywords.join(', ')}`,
+      `• Uygulanan Haritalama Kuralları:`,
+      ...rep.sectionB.mappingRulesUsed.map((rule) => `  - ${rule}`),
+      `• Veri Doğrulama Notu: ${rep.sectionB.dataVerificationNoteTr}`,
+      '',
+      `[C. HER SEMBOL İÇİN AYRINTILI GEREKÇE VE AÇIKLAMA] [SEMBOL KATMANLARI]`,
+      ...rep.sectionC.symbols.map((sym, i) => [
+        `--- Sembol ${i + 1}: ${sym.symbolName} [${sym.weight === 'PRIMARY' ? 'BİRİNCİL MERKEZİ ODAK' : 'İKİNCİL / AKIŞ ELEMANI'}] ---`,
+        `1. Sembolün Adı: ${sym.symbolName}`,
+        `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
+        `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
+        `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
+        `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
+        `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
+        `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
+      ].join('\n')),
+      '',
+      `[D. ÇAKRA VE DESTEK TEMALARININ TASARIMA AKTARILMASI]`,
+      `• Seçilen Destek Çakraları: ${rep.sectionD.selectedChakras.join(', ')}`,
+      `• Seçim Gerekçesi (≤4 Kuralı & Baskın Çakra Ayrımı): ${rep.sectionD.rationaleTr}`,
+      `• Sembolik Form İşlevi: ${rep.sectionD.symbolicFormFunctionTr}`,
+      `• Tıbbi Olmayan Bildirim: ${rep.sectionD.nonMedicalDisclaimerTr}`,
+      '',
+      `[E. ARKETİP VE GÖLGE DÖNÜŞÜM ANLATISI]`,
+      `• Baskın Arketip: ${rep.sectionE.primaryArchetypeTr}${rep.sectionE.secondaryArchetypeTr ? ` | İkincil Arketip: ${rep.sectionE.secondaryArchetypeTr}` : ''}`,
+      `• Gölge Arketip Adı: ${rep.sectionE.shadowArchetypeNameTr}`,
+      `• Dönüşüm Sembolü: ${rep.sectionE.transformationSymbolTr}`,
+      `• Şefkatli Dönüşüm Anlatısı:`,
+      `  ${rep.sectionE.transformationNarrativeTr}`,
+      '',
+      `[F. TOTEM ENTEGRASYONU]`,
+      `• Totem Analizi Durumu: ${rep.sectionF.hasTotemAnalysis ? 'Tamamlandı' : 'Henüz tamamlanmadı'}`,
+      rep.sectionF.hasTotemAnalysis
+        ? `• Birincil Totem: ${rep.sectionF.primaryTotemTr || '-'}${rep.sectionF.secondaryTotemTr ? ` | İkincil Totem: ${rep.sectionF.secondaryTotemTr}` : ''}`
+        : '',
+      `• Görsel Entegrasyon Tercihi: ${rep.sectionF.includeTotemInVisual ? 'Görsele Dahil Edildi (Soyut Geometrik Silüet)' : 'Görselden Hariç Tutuldu (Yalnızca felsefi analiz düzeyinde)'}`,
+      `• Entegrasyon ve Temsil Notu: ${rep.sectionF.integrationNoteTr}`,
+      `• Sembolik Rehberlik: ${rep.sectionF.symbolicGuidanceTr}`,
+      '',
+      `[G. BÜTÜNSEL KOMPOZİSYON AÇIKLAMASI]`,
+      `• Merkezi Odak Gerekçesi: ${rep.sectionG.centralFocusRationaleTr}`,
+      `• İkincil Geçişler ve Akış: ${rep.sectionG.secondaryTransitionsTr}`,
+      `• Negatif Alan İlkesi: ${rep.sectionG.negativeSpaceRatioTr}`,
+      `• Kompozisyon Bütünlüğü ve Kenetlenme İlkeleri:`,
+      ...rep.sectionG.holisticIntegrationRules.map((rule) => `  - ${rule}`),
+      '',
+      `[H. ANATOMİK VE TEKNİK DÖVME TALİMATI]`,
+      `• Vücut Bölgesi ve Akış: ${rep.sectionH.anatomicalPlacementTr}`,
+      `• Ölçü ve Ölçek Standartları: ${rep.sectionH.recommendedDimensionsTr}`,
+      `• İğne ve Uygulama Tavsiyeleri:`,
+      ...rep.sectionH.needleAndTechniqueGuidance.map((g) => `  - ${g}`),
+      `• Cilt Yaşlanması ve Çizgi Aralığı Kuralı: ${rep.sectionH.agingAndLineSpacingTr}`,
+      '',
+      `[I. KİŞİSEL TASARIM MANİFESTOSU]`,
+      rep.sectionI.manifestoTr,
+      '',
+      `[J. TEKNİK GÖRSEL ÜRETİM İSTEMİ (AI PROMPTS)]`,
+      `• Birincil İngilizce İstem (Midjourney / SD):`,
+      rep.sectionJ.primaryPromptEn,
+      '',
+      `• Negatif Filtre İstemleri:`,
+      rep.sectionJ.negativePromptEn,
+      '',
+      `• En / Boy Oranı: ${rep.sectionJ.aspectRatio}`,
+      rep.sectionJ.artisticModifiers && rep.sectionJ.artisticModifiers.length > 0
+        ? `• Sanatsal Modifikatörler: ${rep.sectionJ.artisticModifiers.join(', ')}`
+        : '',
+      `• Teknik Temizlik Bildirimi: ${rep.sectionJ.technicalCleanlinessNoteTr}`,
+    ];
+
+    return lines.filter(Boolean).join('\n');
+  }
+
+  // Geriye dönük uyumluluk (Legacy fallback)
   const styleMeta = TATTOO_STYLES[r.style] || TATTOO_STYLES.FINE_LINE;
   const placementMeta = BODY_PLACEMENTS[r.recommendedPlacement] || BODY_PLACEMENTS.FOREARM_INNER;
   const colorMeta = COLOR_PROFILES[r.colorProfile] || COLOR_PROFILES.MONOCHROME_BLACK;
@@ -196,6 +301,22 @@ export function formatVisualPromptText(client: Client, design: ClientTattooDesig
  * 5. Tüm Tasarım Paketi Metni
  */
 export function formatFullDesignPackageText(client: Client, design: ClientTattooDesign): string {
+  if (design.recipe.comprehensiveReport) {
+    return [
+      `=======================================================`,
+      `KİŞİYE ÖZEL DÖVME TASARIM VE UYGULAMA PAKETİ (V${design.versionNumber})`,
+      `Danışan: ${client.firstName} ${client.lastName} (${client.id})`,
+      `Oluşturulma Tarihi: ${new Date(design.createdAt).toLocaleString('tr-TR')}`,
+      `=======================================================`,
+      '',
+      formatTattooRecipeText(client, design),
+      '',
+      `=======================================================`,
+      `© Dövme Tasarım Asistanı — Kişiselleştirilmiş Bütünsel Tasarım Raporu`,
+      `=======================================================`,
+    ].join('\n');
+  }
+
   return [
     `=======================================================`,
     `KİŞİYE ÖZEL DÖVME TASARIM VE UYGULAMA PAKETİ (V${design.versionNumber})`,
@@ -262,6 +383,45 @@ export function formatDesignSummaryText(client: Client, design: ClientTattooDesi
  */
 export function formatSymbolCompositionText(client: Client, design: ClientTattooDesign): string {
   const r = design.recipe;
+  const rep = r.comprehensiveReport;
+
+  if (rep && rep.sectionC && rep.sectionC.symbols.length > 0) {
+    const lines: string[] = [
+      `=== SEMBOL KOMPOZİSYONU VE GEREKÇELERİ (V${design.versionNumber}) ===`,
+      `Danışan: ${client.firstName} ${client.lastName} (${client.id})`,
+      `Tasarım: ${design.title}`,
+      '',
+      `[ANA SEMBOL]`,
+      r.primarySymbol || 'Kayıt bulunmuyor.',
+      '',
+      `[İKİNCİL SEMBOLLER]`,
+      r.secondarySymbols && r.secondarySymbols.length > 0
+        ? r.secondarySymbols.map((s) => `• ${s}`).join('\n')
+        : 'Kayıt bulunmuyor.',
+      '',
+      `[HARİÇ TUTULAN SEMBOLLER]`,
+      r.excludedElements && r.excludedElements.length > 0
+        ? r.excludedElements.join(', ')
+        : 'Hariç tutulan sembol bulunmuyor.',
+      '',
+      `[TOTEM GÖRSEL ENTEGRASYON DURUMU]`,
+      r.totemAbstractionNotes || 'Totem görsel olarak dahil edilmedi.',
+      '',
+      `[HER SEMBOL İÇİN AYRINTILI GEREKÇE (7 KRİTER)]`,
+      ...rep.sectionC.symbols.map((sym, i) => [
+        `--- Sembol ${i + 1}: ${sym.symbolName} [${sym.weight === 'PRIMARY' ? 'BİRİNCİL MERKEZİ ODAK' : 'İKİNCİL / AKIŞ ELEMANI'}] ---`,
+        `1. Sembolün Adı: ${sym.symbolName}`,
+        `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
+        `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
+        `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
+        `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
+        `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
+        `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
+      ].join('\n')),
+    ];
+
+    return lines.join('\n');
+  }
 
   const lines: string[] = [
     `=== SEMBOL KOMPOZİSYONU (V${design.versionNumber}) ===`,

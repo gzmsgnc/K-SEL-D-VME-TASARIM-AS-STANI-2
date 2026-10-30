@@ -24,6 +24,168 @@ export type BodyPlacement =
   | 'CALF'                  // Baldır
   | 'COLLARBONE';           // Köprücük Kemiği
 
+export interface DetailedSymbolRationale {
+  symbolName: string;                     // 1. Sembolün adı
+  originSourceTr: string;                 // 2. Hangi analiz sonucu veya tasarım tercihi nedeniyle seçildi
+  personalThemeTr: string;                // 3. Temsil ettiği kişisel tema
+  compositionRoleTr: string;              // 4. Kompozisyondaki görevi
+  relatedSymbolNameTr: string;            // 5. Hangi sembolle ilişkili ve bu ilişki neden kuruldu
+  visualExecutionTr: string;              // 6. Görsel olarak nasıl işlenmeli
+  layerLossMeaningTr: string;             // 7. Sembol çıkarılırsa tasarımın hangi anlam katmanı kaybolur
+  isPrimary: boolean;
+  // Uyumluluk ve formatlama alanları
+  originAnalysis?: string;
+  originValue?: string;
+  personalTheme?: string;
+  compositionRole?: string;
+  relatedSymbol?: string;
+  visualExecution?: string;
+  meaningRiskIfRemoved?: string;
+  weight?: 'PRIMARY' | 'SECONDARY';
+}
+
+export interface ComprehensiveDesignReport {
+  clientSummary: {
+    clientId: string;
+    clientFullName: string;
+    versionNumber: number;
+    title: string;
+    styleTr: string;
+    placementTr: string;
+    dimensionsFormatted: string;
+    dimensionWarningTr?: string;
+    colorProfileTr: string;
+    completedAnalyses: string[];
+    missingAnalyses: string[];
+  };
+  analysisTransitionNarrative: {
+    sourceAnalysesUsed: string[];
+    transitionPoints: {
+      layerNameTr: string;
+      themeIntroducedTr: string;
+      mappingRuleTr: string;
+      isSupportedByData: boolean;
+    }[];
+  };
+  detailedSymbols: DetailedSymbolRationale[];
+  chakraIntegration: {
+    targetedChakras: string[];
+    selectionRationaleTr: string;
+    formFunctionsTr: string;
+    symbolicContextNoticeTr: string;
+  };
+  archetypeNarrative: {
+    primaryArchetypeTr: string;
+    secondaryArchetypeTr?: string;
+    shadowArchetypeTr?: string;
+    transformationSymbolTr?: string;
+    compassionatePerspectiveTr: string;
+  };
+  totemIntegration: {
+    hasCompletedTotem: boolean;
+    primaryTotemTr?: string;
+    secondaryTotemTr?: string;
+    isVisualIncluded: boolean;
+    totemStatusExplanationTr: string;
+    abstractionGuidelineTr?: string;
+  };
+  compositionPhilosophy: {
+    centralFocusRationaleTr: string;
+    secondaryArrangementRationaleTr: string;
+    flowAndNegativeSpaceTr: string;
+    holisticIntegrationRulesTr: string[];
+  };
+  anatomicalAndTechnicalDirective: {
+    placementAndFlowTr: string;
+    dimensionsExplicit: {
+      widthCm: number;
+      heightCm: number;
+      orientationOrderTr: string;
+      isBelowMinimum: boolean;
+      minimumDimensionsNoticeTr: string;
+    };
+    lineworkAndNeedleAdviceTr: string[];
+    skinAgingAndNegativeSpaceAdviceTr: string;
+  };
+  conceptManifesto: string;
+  technicalPromptDirective: {
+    englishPrompt: string;
+    negativePrompt: string;
+    aspectRatio: string;
+    forbiddenElementsAudited: string[];
+  };
+  // A57: Bölüm Bazlı Erişim Kısayolları (Section Aliases A - J)
+  sectionA: {
+    clientSummary: string;
+    clientId: string;
+    recipeVersion: number;
+    title: string;
+    styleTr: string;
+    placementTr: string;
+    placementDetailTr?: string;
+    recommendedDimensions: string;
+    customDimensions?: string;
+    dimensionWarningTr?: string;
+    colorProfileTr: string;
+    colorRationaleTr?: string;
+    activeAnalysisModulesSummary?: string[];
+    completedModules: string[];
+    missingModules: string[];
+  };
+  sectionB: {
+    originAnalysesSummary: string[];
+    thematicKeywords: string[];
+    mappingRulesUsed: string[];
+    dataVerificationNoteTr: string;
+  };
+  sectionC: {
+    symbols: DetailedSymbolRationale[];
+  };
+  sectionD: {
+    selectedChakras: string[];
+    rationaleTr: string;
+    symbolicFormFunctionTr: string;
+    nonMedicalDisclaimerTr: string;
+  };
+  sectionE: {
+    primaryArchetypeTr: string;
+    secondaryArchetypeTr?: string;
+    shadowArchetypeNameTr: string;
+    transformationSymbolTr: string;
+    transformationNarrativeTr: string;
+  };
+  sectionF: {
+    hasTotemAnalysis: boolean;
+    primaryTotemTr?: string;
+    secondaryTotemTr?: string;
+    includeTotemInVisual: boolean;
+    integrationNoteTr: string;
+    symbolicGuidanceTr: string;
+  };
+  sectionG: {
+    centralFocusRationaleTr: string;
+    secondaryTransitionsTr: string;
+    negativeSpaceRatioTr: string;
+    holisticIntegrationRules: string[];
+  };
+  sectionH: {
+    anatomicalPlacementTr: string;
+    recommendedDimensionsTr: string;
+    needleAndTechniqueGuidance: string[];
+    agingAndLineSpacingTr: string;
+  };
+  sectionI: {
+    manifestoTr: string;
+  };
+  sectionJ: {
+    primaryPromptEn: string;
+    negativePromptEn: string;
+    aspectRatio: string;
+    artisticModifiers?: string[];
+    technicalCleanlinessNoteTr: string;
+  };
+}
+
 export interface TattooRecipe {
   style: TattooStyle;
   recommendedPlacement: BodyPlacement;
@@ -44,6 +206,8 @@ export interface TattooRecipe {
   artistVisualDirection?: string[];   // Tasarımcıya yönelik görsel yönlendirmeler
   keyComponents: string[];        // Dövmede yer alacak temel unsurlar ve semboller
   technicalAdviceForArtist: string[]; // Dövme sanatçısına yönelik teknik tavsiyeler (iğne no, gölgeleme derinliği vb.)
+  detailedSymbols?: DetailedSymbolRationale[]; // A57: Her sembol için ayrıntılı ve gerekçeli açıklama
+  comprehensiveReport?: ComprehensiveDesignReport; // A57: 10 Bölümlü Danışana Sunulabilir Kişisel Tasarım Raporu
 }
 
 export interface AIPromptData {

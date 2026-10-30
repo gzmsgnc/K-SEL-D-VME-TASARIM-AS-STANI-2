@@ -3,6 +3,7 @@ import { ClientArchiveRecord } from '../types/archive';
 import { TATTOO_STYLES, BODY_PLACEMENTS, COLOR_PROFILES } from '../modules/recipe';
 import { CHAKRA_DEFINITIONS } from '../modules/chakra';
 import { TROPICAL_ZODIAC_SIGNS } from '../modules/astrology';
+import { formatTattooRecipeText } from './tattooDesignFormatters';
 
 /**
  * Danışan Dosyası ve Dışa Aktarma Motoru (A26)
@@ -91,7 +92,7 @@ export function generateClientDossierText(
       [
         `3. BATI / TROPICAL ASTROLOJİ ANALİZİ`,
         subSeparator,
-        `Sistem / Evler    : Tropical (Batı) / Placidus Ev Sistemi`,
+        `Sistem            : Tropical (Batı) Zodyak`,
         `Güneş Burcu       : ${sunSignTr} (${astro.sunSign || '-'})`,
         `Ay Burcu          : ${moonSignTr} (${astro.moonSign || '-'})`,
         `Yükselen Burç     : ${risingSignTr}`,
@@ -251,30 +252,40 @@ export function generateClientDossierText(
 
   // 9. Dövme Reçetesi (En Son Sürüm)
   if (latestDesign) {
-    const r = latestDesign.recipe;
-    sections.push(
-      [
-        `9. GÜNCEL DÖVME REÇETESİ (Sürüm V${latestDesign.versionNumber})`,
-        subSeparator,
-        `Reçete Başlığı    : ${latestDesign.title}`,
-        `Kayıt Tarihi      : ${new Date(latestDesign.createdAt).toLocaleString('tr-TR')}`,
-        `Kişisel Manifesto : "${latestDesign.conceptStatement}"`,
-        `Tasarım Stili     : ${TATTOO_STYLES[r.style]?.nameTr || r.style}`,
-        `Vücut Yerleşimi   : ${BODY_PLACEMENTS[r.recommendedPlacement]?.nameTr || r.recommendedPlacement}`,
-        `Yerleşim Detayı   : ${r.placementDescription}`,
-        `Önerilen Ebat     : ${r.recommendedDimensionsCm.width} cm x ${r.recommendedDimensionsCm.height} cm`,
-        `Renk / Ton Profili: ${COLOR_PROFILES[r.colorProfile]?.nameTr || r.colorProfile}`,
-        `Renk Gerekçesi    : ${r.colorRationale || '-'}`,
-        `Ana Sembol        : ${r.primarySymbol || 'Belirtilmedi'}`,
-        `İkincil Semboller : ${r.secondarySymbols?.join(', ') || 'Yok'}`,
-        `Hariç Tutulanlar  : ${r.excludedElements?.length ? r.excludedElements.join(', ') : 'Hariç tutulan sembol yok'}`,
-        `Totem Entegrasyonu: ${r.totemAbstractionNotes || 'Totem analizi görselden hariç tutuldu'}`,
-        `Temel Bileşenler  :`,
-        (r.keyComponents || []).map((k) => `  - ${k}`).join('\n') || '  - Belirtilmedi.',
-        `Sanatçıya Teknik Tavsiyeler:`,
-        (r.technicalAdviceForArtist || []).map((t) => `  - ${t}`).join('\n') || '  - Belirtilmedi.',
-      ].join('\n')
-    );
+    if (latestDesign.recipe.comprehensiveReport) {
+      sections.push(
+        [
+          `9. GÜNCEL DÖVME REÇETESİ VE KAPSAMLI TASARIM RAPORU (Sürüm V${latestDesign.versionNumber})`,
+          subSeparator,
+          formatTattooRecipeText(client, latestDesign),
+        ].join('\n')
+      );
+    } else {
+      const r = latestDesign.recipe;
+      sections.push(
+        [
+          `9. GÜNCEL DÖVME REÇETESİ (Sürüm V${latestDesign.versionNumber})`,
+          subSeparator,
+          `Reçete Başlığı    : ${latestDesign.title}`,
+          `Kayıt Tarihi      : ${new Date(latestDesign.createdAt).toLocaleString('tr-TR')}`,
+          `Kişisel Manifesto : "${latestDesign.conceptStatement}"`,
+          `Tasarım Stili     : ${TATTOO_STYLES[r.style]?.nameTr || r.style}`,
+          `Vücut Yerleşimi   : ${BODY_PLACEMENTS[r.recommendedPlacement]?.nameTr || r.recommendedPlacement}`,
+          `Yerleşim Detayı   : ${r.placementDescription}`,
+          `Önerilen Ebat     : ${r.recommendedDimensionsCm.width} cm x ${r.recommendedDimensionsCm.height} cm`,
+          `Renk / Ton Profili: ${COLOR_PROFILES[r.colorProfile]?.nameTr || r.colorProfile}`,
+          `Renk Gerekçesi    : ${r.colorRationale || '-'}`,
+          `Ana Sembol        : ${r.primarySymbol || 'Belirtilmedi'}`,
+          `İkincil Semboller : ${r.secondarySymbols?.join(', ') || 'Yok'}`,
+          `Hariç Tutulanlar  : ${r.excludedElements?.length ? r.excludedElements.join(', ') : 'Hariç tutulan sembol yok'}`,
+          `Totem Entegrasyonu: ${r.totemAbstractionNotes || 'Totem analizi görselden hariç tutuldu'}`,
+          `Temel Bileşenler  :`,
+          (r.keyComponents || []).map((k) => `  - ${k}`).join('\n') || '  - Belirtilmedi.',
+          `Sanatçıya Teknik Tavsiyeler:`,
+          (r.technicalAdviceForArtist || []).map((t) => `  - ${t}`).join('\n') || '  - Belirtilmedi.',
+        ].join('\n')
+      );
+    }
   } else {
     sections.push(
       [

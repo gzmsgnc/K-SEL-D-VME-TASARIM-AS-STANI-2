@@ -198,13 +198,15 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
       .filter(Boolean);
   }, [excludedSymbolsInput]);
 
-  // Totem bilgisi (arşivden)
+  // Totem bilgisi (arşivden en güncel kayıt)
   const totemTest = useMemo(() => {
     if (!archive?.testResults) return null;
-    return archive.testResults.find((t) => t.clientId === client.id && t.testType === 'ANIMAL_TOTEM');
+    return [...archive.testResults].reverse().find((t) => t.clientId === client.id && t.testType === 'ANIMAL_TOTEM');
   }, [archive, client.id]);
 
-  const totemName = totemTest?.primaryType || undefined;
+  const totemName = totemTest
+    ? (totemTest.secondaryType ? `${totemTest.primaryType} ve ${totemTest.secondaryType}` : totemTest.primaryType)
+    : undefined;
 
   // Enneagram bilgisi (arşivden)
   const enneagramTest = useMemo(() => {

@@ -46,6 +46,8 @@ import {
   ShieldCheck,
   Info,
   Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface ClientTattooDesignResultHubProps {
@@ -68,6 +70,7 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [copiedFeedbackMessage, setCopiedFeedbackMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedSymbolIndex, setExpandedSymbolIndex] = useState<number | null>(null);
 
   // Danışana ait tasarımlar (A25 / A30 Danışan İzolasyonu: SADECE aktif clientId)
   const clientDesigns: ClientTattooDesign[] = useMemo(() => {
@@ -523,6 +526,33 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                 {colorMeta.nameTr}
               </span>
             </div>
+
+            {recipe.comprehensiveReport?.sectionA?.dimensionWarningTr && (
+              <div className="col-span-2 p-2.5 bg-amber-950/40 border border-amber-600/60 rounded-lg flex items-start gap-2 text-xs text-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span className="leading-snug">{recipe.comprehensiveReport.sectionA.dimensionWarningTr}</span>
+              </div>
+            )}
+
+            {recipe.comprehensiveReport?.sectionA && (
+              <div className="col-span-2 p-2.5 bg-stone-950/60 border border-stone-800 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-stone-400 font-semibold block">
+                  Analiz Modülleri Durumu
+                </span>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {recipe.comprehensiveReport.sectionA.completedModules.map((m, idx) => (
+                    <span key={idx} className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-800/60 text-emerald-300">
+                      ✓ {m}
+                    </span>
+                  ))}
+                  {recipe.comprehensiveReport.sectionA.missingModules.map((m, idx) => (
+                    <span key={idx} className="px-2 py-0.5 rounded bg-stone-900 border border-stone-800 text-stone-500">
+                      ○ {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -590,6 +620,86 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                 </span>
               </div>
             </div>
+
+            {/* A57: Her Sembol İçin 7 Kriterli Gerekçe Listesi */}
+            {recipe.comprehensiveReport?.sectionC?.symbols && recipe.comprehensiveReport.sectionC.symbols.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-stone-800">
+                <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
+                  Sembol Gerekçeleri & Katman Analizi (7 Kriter)
+                </span>
+                <div className="space-y-2">
+                  {recipe.comprehensiveReport.sectionC.symbols.map((sym, idx) => {
+                    const isExpanded = expandedSymbolIndex === idx;
+                    return (
+                      <div key={idx} className="p-2.5 bg-stone-950/90 border border-stone-800 rounded-lg space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSymbolIndex(isExpanded ? null : idx)}
+                          className="w-full flex items-center justify-between text-left cursor-pointer"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-amber-300">
+                              {sym.symbolName}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-stone-900 border border-stone-800 text-stone-400">
+                              {sym.weight === 'PRIMARY' ? 'Merkezi Odak' : 'İkincil / Akış'}
+                            </span>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-stone-800/80 text-[11px]">
+                            <div>
+                              <span className="text-[10px] text-stone-500 block">Kaynak:</span>
+                              <span className="text-stone-300">{sym.originAnalysis} ({sym.originValue})</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-stone-500 block">Kişisel Tema:</span>
+                              <span className="text-stone-300">{sym.personalTheme}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-stone-500 block">Kompozisyondaki Rol:</span>
+                              <span className="text-stone-300">{sym.compositionRole}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-stone-500 block">İlişkili Sembol:</span>
+                              <span className="text-stone-300">{sym.relatedSymbol}</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="text-[10px] text-stone-500 block">Görsel İşleniş:</span>
+                              <span className="text-stone-300">{sym.visualExecution}</span>
+                            </div>
+                            <div className="sm:col-span-2 text-rose-300/90 bg-rose-950/20 p-1.5 rounded border border-rose-900/30">
+                              <span className="text-[10px] text-rose-400 block font-semibold">Katman Kaybı Riski:</span>
+                              <span>{sym.meaningRiskIfRemoved}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Kart 2 Sonu: Genel Kopyala */}
+            <div className="pt-2 border-t border-stone-800/80 flex items-center justify-between">
+              <span className="text-[10px] text-stone-500">Sembol ve Katman Gerekçeleri</span>
+              <button
+                type="button"
+                onClick={() => handleCopy(formatSymbolCompositionText(client, activeDesign), 'symbols', 'Sembol Kompozisyonu')}
+                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 rounded-lg text-xs font-semibold text-amber-300 flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Sembol kompozisyonu ve tüm gerekçeleri tek seferde panoya kopyala"
+              >
+                {copiedType === 'symbols' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{copiedType === 'symbols' ? 'Kopyalandı' : 'Genel Kopyala'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -622,12 +732,14 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
           </div>
         </div>
 
-        {/* KART 4: DÖVME REÇETESİ */}
+        {/* KART 4: DÖVME REÇETESİ & KAPSAMLI TASARIM RAPORU */}
         <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-stone-800">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-amber-400" />
-              <h4 className="text-sm font-semibold text-stone-200">4. Dövme Reçetesi</h4>
+              <h4 className="text-sm font-semibold text-stone-200">
+                4. Dövme Reçetesi & Tasarım Raporu
+              </h4>
             </div>
             <button
               type="button"
@@ -640,12 +752,128 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
           </div>
 
           <div className="space-y-3 text-xs">
-            {/* Reçete Kombinasyon Kuralları */}
-            <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
-              <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
-                Sembol Kombinasyon & Hiyerarşi Kuralları
-              </span>
-              {recipe.symbolCombinationRules && recipe.symbolCombinationRules.length > 0 ? (
+            {/* B. Kişisel Analizden Tasarıma Geçiş */}
+            {recipe.comprehensiveReport?.sectionB && (
+              <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
+                  Bölüm B: Analizden Tasarıma Geçiş & Doğrulama
+                </span>
+                <p className="text-[11px] text-stone-300">
+                  {recipe.comprehensiveReport.sectionB.dataVerificationNoteTr}
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {recipe.comprehensiveReport.sectionB.thematicKeywords.map((kw, idx) => (
+                    <span key={idx} className="px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-[10px] text-amber-300/90 font-mono">
+                      #{kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* D. Çakra & Destek Temaları */}
+            {recipe.comprehensiveReport?.sectionD && (
+              <div className="p-3 bg-stone-950/70 border border-emerald-950/40 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-emerald-400 font-bold block">
+                  Bölüm D: Çakra Destek Temaları
+                </span>
+                <div className="text-[11px] text-stone-200">
+                  <span className="font-semibold text-emerald-300">Destek Çakraları: </span>
+                  {recipe.comprehensiveReport.sectionD.selectedChakras.join(', ')}
+                </div>
+                <p className="text-[11px] text-stone-300">
+                  {recipe.comprehensiveReport.sectionD.rationaleTr}
+                </p>
+                <p className="text-[11px] text-stone-400 italic">
+                  {recipe.comprehensiveReport.sectionD.symbolicFormFunctionTr}
+                </p>
+                <div className="p-2 bg-stone-900/80 border border-stone-800 rounded text-[10px] text-stone-400 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-stone-500 shrink-0 mt-0.5" />
+                  <span>{recipe.comprehensiveReport.sectionD.nonMedicalDisclaimerTr}</span>
+                </div>
+              </div>
+            )}
+
+            {/* E. Arketip ve Gölge Dönüşüm Anlatısı */}
+            {recipe.comprehensiveReport?.sectionE && (
+              <div className="p-3 bg-stone-950/70 border border-purple-950/40 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-purple-400 font-bold block">
+                  Bölüm E: Arketip & Gölge Dönüşüm Anlatısı
+                </span>
+                <div className="text-[11px] text-stone-200">
+                  <span className="font-semibold text-purple-300">Gölge Arketip: </span>
+                  {recipe.comprehensiveReport.sectionE.shadowArchetypeNameTr}
+                  <span className="mx-1.5 text-stone-600">|</span>
+                  <span className="font-semibold text-purple-300">Dönüşüm Sembolü: </span>
+                  {recipe.comprehensiveReport.sectionE.transformationSymbolTr}
+                </div>
+                <p className="text-[11px] text-stone-300 leading-relaxed italic bg-purple-950/20 p-2 rounded border border-purple-900/30">
+                  "{recipe.comprehensiveReport.sectionE.transformationNarrativeTr}"
+                </p>
+              </div>
+            )}
+
+            {/* F. Totem Entegrasyonu */}
+            {recipe.comprehensiveReport?.sectionF && (
+              <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1">
+                <span className="text-[10px] uppercase font-mono text-amber-400 font-semibold block">
+                  Bölüm F: Totem Entegrasyonu
+                </span>
+                <p className="text-[11px] text-stone-300">
+                  {recipe.comprehensiveReport.sectionF.integrationNoteTr}
+                </p>
+                <p className="text-[10px] text-stone-400">
+                  {recipe.comprehensiveReport.sectionF.symbolicGuidanceTr}
+                </p>
+              </div>
+            )}
+
+            {/* G. Bütünsel Kompozisyon & Negatif Alan */}
+            {recipe.comprehensiveReport?.sectionG && (
+              <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
+                    Bölüm G: Bütünsel Kompozisyon & Hiyerarşi
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-stone-900 border border-stone-800 text-stone-300">
+                    {recipe.comprehensiveReport.sectionG.negativeSpaceRatioTr}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-300">
+                  {recipe.comprehensiveReport.sectionG.centralFocusRationaleTr}
+                </p>
+                <ul className="space-y-1 pt-1">
+                  {recipe.comprehensiveReport.sectionG.holisticIntegrationRules.map((rule, idx) => (
+                    <li key={idx} className="text-stone-300 text-[11px] flex items-start gap-1.5">
+                      <span className="text-stone-500">•</span>
+                      <span>{rule}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* H. Anatomik & Teknik Dövme Talimatları */}
+            {recipe.comprehensiveReport?.sectionH && (
+              <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-stone-400 font-bold block">
+                  Bölüm H: Anatomik & Teknik Uygulama
+                </span>
+                <p className="text-[11px] text-stone-200 font-medium">
+                  {recipe.comprehensiveReport.sectionH.recommendedDimensionsTr}
+                </p>
+                <p className="text-[10px] text-stone-400">
+                  {recipe.comprehensiveReport.sectionH.agingAndLineSpacingTr}
+                </p>
+              </div>
+            )}
+
+            {/* Geriye dönük kurallar (Fallback if no comprehensive report) */}
+            {!recipe.comprehensiveReport && recipe.symbolCombinationRules && recipe.symbolCombinationRules.length > 0 && (
+              <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
+                  Sembol Kombinasyon & Hiyerarşi Kuralları
+                </span>
                 <ul className="space-y-1">
                   {recipe.symbolCombinationRules.map((r, idx) => (
                     <li key={idx} className="text-stone-300 text-[11px] flex items-start gap-1.5">
@@ -654,56 +882,17 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <span className="text-stone-500 italic block">Kayıt bulunmuyor.</span>
-              )}
-            </div>
-
-            {/* Çakra ve Gölge Teması */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="p-2.5 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1">
-                <span className="text-[10px] uppercase font-mono text-purple-400 font-semibold block">
-                  Gölge Arketip Dönüşümü
-                </span>
-                <span className="text-[11px] text-stone-300 block">
-                  {recipe.shadowTransformationTheme || 'Kayıt bulunmuyor.'}
-                </span>
-              </div>
-
-              <div className="p-2.5 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1">
-                <span className="text-[10px] uppercase font-mono text-emerald-400 font-semibold block">
-                  Çakra Desteği Yansıması
-                </span>
-                <span className="text-[11px] text-stone-300 block">
-                  {recipe.chakraSupportReflection || 'Kayıt bulunmuyor.'}
-                </span>
-              </div>
-            </div>
-
-            {/* Temel Unsurlar */}
-            {recipe.keyComponents && recipe.keyComponents.length > 0 && (
-              <div className="p-2.5 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1">
-                <span className="text-[10px] uppercase font-mono text-stone-400 font-semibold block">
-                  Temel Unsurlar (Bileşenler)
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {recipe.keyComponents.map((c, idx) => (
-                    <span key={idx} className="px-2 py-0.5 rounded bg-stone-900 border border-stone-800 text-[10px] text-stone-300">
-                      {c}
-                    </span>
-                  ))}
-                </div>
               </div>
             )}
 
             {/* Reçete Sonu: Genel Kopyala */}
             <div className="pt-3 border-t border-stone-800/80 flex items-center justify-between">
-              <span className="text-[10px] text-stone-500">Tüm Reçete Parametreleri & Geometri</span>
+              <span className="text-[10px] text-stone-500">Tüm 10 Bölümlü Kapsamlı Tasarım Raporu</span>
               <button
                 type="button"
-                onClick={() => handleCopy(formatTattooRecipeText(client, activeDesign), 'recipe', 'Dövme Reçetesi')}
+                onClick={() => handleCopy(formatTattooRecipeText(client, activeDesign), 'recipe', 'Kapsamlı Tasarım Raporu')}
                 className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 rounded-lg text-xs font-semibold text-amber-300 flex items-center gap-1.5 cursor-pointer transition-colors"
-                title="Dövme reçetesinin tüm içeriğini tek seferde panoya kopyala"
+                title="Dövme reçetesi ve 10 bölümlü kapsamlı tasarım raporunu tek seferde panoya kopyala"
               >
                 {copiedType === 'recipe' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
                 <span>{copiedType === 'recipe' ? 'Kopyalandı' : 'Genel Kopyala'}</span>

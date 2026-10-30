@@ -88,9 +88,9 @@ export const BODY_PLACEMENTS: Record<BodyPlacement, BodyPlacementInfo> = {
   FOREARM_INNER: {
     id: 'FOREARM_INNER',
     nameTr: 'İç Ön Kol',
-    recommendedDimensions: { width: 8, height: 16 },
+    recommendedDimensions: { width: 14, height: 22 },
     anatomicalFlowTr: 'Bilekten dirsek çukuruna uzanan dikey eksen; tasarımın yukarı veya içeri yönelimi dengeli olmalıdır.',
-    curvatureAdviceTr: 'Bilek rotasyonu sırasında tasarımın bükülmesini önlemek için orta hatta dikey simetri önerilir.',
+    curvatureAdviceTr: 'Bilek rotasyonu sırasında tasarımın bükülmesini önlemek için orta hatta dikey simetri önerilir (İdeal: 22 × 14 cm, en az: 16 × 10 cm).',
   },
   FOREARM_OUTER: {
     id: 'FOREARM_OUTER',

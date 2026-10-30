@@ -991,6 +991,20 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       const res = saveClientTestResult(client.id, result);
       if (res.success) {
         setIsEnneagramTaking(false);
+        // Aktif tasarım reçetesi varsa yeni tamamlanan Enneagram sonucunu yansıtmak üzere senkronize et
+        if (archive && archive.designs && archive.designs.length > 0) {
+          const updatedArchive: ClientArchiveRecord = {
+            ...archive,
+            testResults: [
+              ...(archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ENNEAGRAM')),
+              result,
+            ],
+          };
+          const recipeRes = generateClientRecipe(client, updatedArchive);
+          if (recipeRes.success && recipeRes.design) {
+            saveClientDesign(client.id, recipeRes.design);
+          }
+        }
         setEnneagramFeedback({
           type: 'success',
           message: `Enneagram testi başarıyla tamamlandı: ${result.primaryType} (${result.secondaryType || ''}) danışan arşivine kaydedildi.`,
@@ -1015,6 +1029,17 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     setEnneagramActiveQIndex(0);
     setIsEnneagramTaking(false);
     setShowClearEnneagramConfirm(false);
+    // Aktif tasarım reçetesi varsa Enneagram sıfırlanınca reçeteyi de güncel duruma (eksik Enneagram) senkronize et
+    if (archive && archive.designs && archive.designs.length > 0) {
+      const updatedArchive: ClientArchiveRecord = {
+        ...archive,
+        testResults: (archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ENNEAGRAM')),
+      };
+      const recipeRes = generateClientRecipe(client, updatedArchive);
+      if (recipeRes.success && recipeRes.design) {
+        saveClientDesign(client.id, recipeRes.design);
+      }
+    }
     setEnneagramFeedback({
       type: 'success',
       message: 'Enneagram test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
@@ -1048,6 +1073,20 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       const res = saveClientTestResult(client.id, result);
       if (res.success) {
         setIsTotemTaking(false);
+        // Aktif tasarım reçetesi varsa yeni tamamlanan totem sonucunu yansıtmak üzere senkronize et
+        if (archive && archive.designs && archive.designs.length > 0) {
+          const updatedArchive: ClientArchiveRecord = {
+            ...archive,
+            testResults: [
+              ...(archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ANIMAL_TOTEM')),
+              result,
+            ],
+          };
+          const recipeRes = generateClientRecipe(client, updatedArchive);
+          if (recipeRes.success && recipeRes.design) {
+            saveClientDesign(client.id, recipeRes.design);
+          }
+        }
         setTotemFeedback({
           type: 'success',
           message: `Hayvan Totemi testi başarıyla tamamlandı: ${result.primaryType} (${TOTEM_ANIMALS[result.primaryType]?.elementTr || ''}) danışan arşivine kaydedildi.`,
@@ -1072,6 +1111,17 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     setTotemActiveQIndex(0);
     setIsTotemTaking(false);
     setShowClearTotemConfirm(false);
+    // Aktif tasarım reçetesi varsa Totem sıfırlanınca reçeteyi de güncel duruma (eksik Totem) senkronize et
+    if (archive && archive.designs && archive.designs.length > 0) {
+      const updatedArchive: ClientArchiveRecord = {
+        ...archive,
+        testResults: (archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ANIMAL_TOTEM')),
+      };
+      const recipeRes = generateClientRecipe(client, updatedArchive);
+      if (recipeRes.success && recipeRes.design) {
+        saveClientDesign(client.id, recipeRes.design);
+      }
+    }
     setTotemFeedback({
       type: 'success',
       message: 'Hayvan Totemi test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
