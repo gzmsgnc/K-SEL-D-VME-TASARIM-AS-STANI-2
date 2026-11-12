@@ -21,6 +21,7 @@ import {
   calculateRawBodyEcliptic,
   eclipticLongitudeToZodiac,
   calculateAscendant,
+  isAstrologyChartStale,
   AstrologicalBodyId,
 } from './astrologyCalculationEngine';
 
@@ -98,12 +99,12 @@ export function prepareAstrologyModule(
     };
   }
 
-  // 3. Mevcut Sürüm Kapsam Sınırı (Placidus evleri ve MC kapsam dışıdır; ASC saat biliniyorsa hesaplanabilir)
+  // 3. Mevcut Sürüm Kapsam Sınırı (Placidus evleri ve MC kapsam dışıdır; ASC hesaplanır)
   const canCalculateHouses = false;
-  const canCalculateAscendant = timeCtx.isTimeKnown && Boolean(client.birthDate);
+  const canCalculateAscendant = Boolean(client.birthDate);
   if (!timeCtx.isTimeKnown) {
     warnings.push(
-      'Doğum saati bilinmediği için Yükselen burç (ASC) hesaplanamaz; gezegen konumları öğle 12:00 referansıyla değerlendirilir.'
+      'Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; bu durumda Yükselen burç sonucu kesin değildir.'
     );
   }
 
@@ -141,11 +142,21 @@ export function prepareAstrologyModule(
 
   // 5. Gerçek Sonuç Kontrolü (Sahte sonuç uydurma engeli ve Danışan Kimliği İzolasyonu)
   const isMatchingClient = Boolean(archive && archive.client && archive.client.id === client.id);
-  const isCalculated = isMatchingClient ? hasActualModuleResults(archive, 'ASTROLOGY') : false;
+  const rawChart = isMatchingClient ? getSafeModuleResult<TropicalNatalChart>(archive, 'ASTROLOGY') : null;
+  const isStale = rawChart ? isAstrologyChartStale(rawChart, client) : false;
+  const isCalculated = Boolean(rawChart && !isStale && hasActualModuleResults(archive, 'ASTROLOGY'));
   const status: AstrologyStatus = isCalculated ? 'CALCULATED' : 'READY_FOR_CALCULATION';
+
+  if (rawChart && isStale) {
+    warnings.push(
+      'Danışanın doğum tarihi, saati veya konumu değiştiği için kayıtlı astroloji haritası geçersiz hale gelmiştir. Lütfen güncel bilgilerle yeniden hesaplayınız.'
+    );
+  }
 
   const statusMessageTr = isCalculated
     ? 'Batı / Tropical doğum haritası hesaplanmış ve danışan arşivine kaydedilmiştir.'
+    : (rawChart && isStale)
+    ? 'Doğum bilgileri değiştiğinden eski astroloji hesaplaması geçersizdir. Yeniden hesaplama yapılması gereklidir.'
     : engineCheck.isReady
     ? `Doğum koordinatları ve tarihsel UTC zamanı (${historicalUtc?.utcIsoString || 'Hazır'}) doğrulandı. astronomy-engine (v2.1.19 / MIT) hesaplamaya hazırdır.`
     : 'Astronomik hesaplama motoru başlatılamadı.';
@@ -184,7 +195,7 @@ export function prepareAstrologyModule(
 
 /**
  * Bu danışana ait kayıtlı gerçek TropicalNatalChart sonucunu çeker (varsa).
- * Danışan kimliği uyuşmuyorsa veya sonuç yoksa kesinlikle null döner.
+ * Danışan kimliği uyuşmuyorsa, sonuç yoksa veya doğum bilgileri değiştiği için bayatsa (stale) kesinlikle null döner.
  */
 export function getStoredTropicalChart(
   archive: ClientArchiveRecord | null,
@@ -193,7 +204,12 @@ export function getStoredTropicalChart(
   if (!archive || (expectedClientId && archive.client?.id !== expectedClientId)) {
     return null;
   }
-  return getSafeModuleResult<TropicalNatalChart>(archive, 'ASTROLOGY');
+  const chart = getSafeModuleResult<TropicalNatalChart>(archive, 'ASTROLOGY');
+  if (!chart || !archive.client) return null;
+  if (isAstrologyChartStale(chart, archive.client)) {
+    return null;
+  }
+  return chart;
 }
 
 /**
@@ -343,11 +359,13 @@ export function calculateClientTropicalChart(
   const sunSign = positions.find((p) => p.body === 'Sun')?.sign;
   const moonSign = positions.find((p) => p.body === 'Moon')?.sign;
 
-  // A39: Yükselen Burç (ASC) YALNIZCA doğum saati kesin biliniyorsa hesaplanır
+  // A39: Yükselen Burç (ASC)
   let ascendantSign: typeof sunSign = undefined;
   let ascendantDegree: number | undefined = undefined;
   let ascendantMinute: number | undefined = undefined;
   let formattedAscendantTr: string | undefined = undefined;
+  let isAscendantDefinitive = true;
+  let ascendantNoticeTr: string | undefined = undefined;
 
   if (timeCtx.isTimeKnown && !client.isBirthTimeUnknown) {
     try {
@@ -360,15 +378,27 @@ export function calculateClientTropicalChart(
       ascendantDegree = ascRes.degree;
       ascendantMinute = ascRes.minute;
       formattedAscendantTr = ascRes.formattedText;
+      isAscendantDefinitive = true;
     } catch (ascErr) {
       warnings.push(`Yükselen burç hesaplanamadı: ${(ascErr as Error).message}`);
     }
+  } else {
+    isAscendantDefinitive = false;
+    ascendantNoticeTr =
+      'Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; bu durumda Yükselen burç sonucu kesin değildir (hesaplanamaz).';
+    warnings.push(ascendantNoticeTr);
   }
+
+  const timeUncertaintyNoticeTr = timeCtx.isNoonReference
+    ? 'Doğum saati bilinmediği için hesaplama 12:00 varsayımıyla yapılmıştır. Ay konumu ve hızlı hareket eden gezegenlerin derecelerinde gün içi sapma payı bulunabilir.'
+    : undefined;
 
   const chart: TropicalNatalChart = {
     zodiacSystem: 'TROPICAL',
     houseSystem: 'PLACIDUS',
-    isBirthTimeUnknown: client.isBirthTimeUnknown,
+    isBirthTimeUnknown: Boolean(client.isBirthTimeUnknown),
+    isNoonReference: timeCtx.isNoonReference,
+    timeUncertaintyNoticeTr,
     birthDate: client.birthDate,
     birthTime: client.isBirthTimeUnknown ? undefined : client.birthTime,
     latitude: coords.latitude,
@@ -379,6 +409,8 @@ export function calculateClientTropicalChart(
     ascendantDegree,
     ascendantMinute,
     formattedAscendantTr,
+    isAscendantDefinitive,
+    ascendantNoticeTr,
     sunSign,
     moonSign,
     planetaryPositions: positions,

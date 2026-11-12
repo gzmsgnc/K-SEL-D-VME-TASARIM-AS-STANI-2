@@ -3,14 +3,25 @@ import { SymbolDefinition, GeometryType } from './types';
 /**
  * MASTER_SYMBOLS: Kadim ve Evrensel Sembol Kütüphanesi
  * 5 Geometrik kategoride, derin kültürel kökenlere, elementlere ve dövme uygulama standartlarına sahip
- * doğrulanmış sembol koleksiyonu.
+ * doğrulanmış 26 kutsal sembol koleksiyonu.
+ *
+ * ADIM 2A: Genişletilmiş ve ayrıştırılmış profesyonel veri alanları:
+ * - visualDescriptionTr: Görsel görünüm ve tanım
+ * - geometricStructureTr: Geometrik çizim ve oran yapısı
+ * - traditionalMeaningTr: Kadim ve tarihsel kök anlam
+ * - esotericMeaningTr: Modern ezoterik ve felsefi yorum
+ * - compositionRole: Dövmedeki kompozisyonel işlevi (%65 ana odak, %35 katman, vurgu vb.)
+ * - culturalGuidelinesTr: Kültürel bağlam, oryantasyon kuralları ve dikkat edilmesi gereken hususlar
+ * - analysisAssociations: Analiz modülleriyle (Numeroloji, Çakra, Astroloji vb.) gerekçeli bağlantılar
  */
 export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
+  // ==========================================
   // 1. KUTSAL GEOMETRİ (SACRED_GEOMETRY)
+  // ==========================================
   'metatron-cube': {
     id: 'metatron-cube',
     name: 'Metatron Küpü',
-    originalName: "Cube of Metatron",
+    originalName: 'Cube of Metatron',
     originCulture: 'Kabala & Kutsal Geometri',
     geometryType: 'SACRED_GEOMETRY',
     elementAssociation: 'Eter / Boşluk',
@@ -21,7 +32,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'CHEST_CENTER', 'SHOULDER_BLADE', 'SPINE_CENTER'],
     },
+    visualDescriptionTr: 'On üç eşit dairenin merkezlerini birbirine bağlayan 78 düz çizginin oluşturduğu karmaşık, iç içe geçmiş üç boyutlu optik yanılsamalı kübik ızgara.',
+    geometricStructureTr: 'Meyve Çiçeği (Fruit of Life) şablonundaki 13 dairenin merkezlerinden geçen doğrularla 5 Platonik cismin (Tetrahedron, Hekzahedron/Küp, Oktahedron, Dodekahedron, İkosahedron) izdüşümünü barındıran kübik simetri.',
+    traditionalMeaningTr: 'Ortaçağ Kabalistik literatüründe baş melek Metatron\'a atfedilen, ilahi enerjinin yaratılışa akışını ve negatif tesirlerden korunmayı temsil eden kutsal geometrik mühür.',
+    esotericMeaningTr: 'Maddi ve ruhsal alemler arasındaki ilahi mimariyi, zihinsel berraklığı ve evrensel düzenin yüksek koruyucu frekansını temsil eden kozmik mühür.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Tüm hatların kusursuz düzlükte ve merkez ekseninin dikeyde sabit tutulması önerilir. Açıların bozulması görsel dengesini zayıflatır; asgari 16×10 cm ve üstü genişlikte ince çizgi (fine line) ile işlenmelidir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 4 & Üstat 11/22/33', rationaleTr: 'Kutsal mimari düzen, sağlam temel ve yüksek kozmik titreşim rezonansı.' },
+      { module: 'CHAKRA', target: 'Tepe Çakrası (Sahasrara)', rationaleTr: 'Kozmik bilinç bağlantısı ve taç merkezinin evrensel açılımı.' },
+      { module: 'ARCHETYPE', target: 'Hükümdar & Mimar', rationaleTr: 'Yapılandırma, koruma ve yüksek liderlik düzeni.' },
+    ],
   },
+
   'flower-of-life': {
     id: 'flower-of-life',
     name: 'Yaşam Çiçeği',
@@ -36,7 +59,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'CHEST_CENTER', 'SHOULDER_BLADE'],
     },
+    visualDescriptionTr: 'Aynı yarıçapa sahip 19 tam ve kısmi çemberin kesişimiyle oluşan, merkezden dışa doğru genişleyen çiçeksi fraktal dairesel örüntü.',
+    geometricStructureTr: 'Her çemberin merkezinin çevresindeki çemberlerin kesişim noktasında yer aldığı altıgen (hegzagonal) simetrili 19 kesişen daire ve bunları çevreleyen çift dış halka.',
+    traditionalMeaningTr: 'Abydos Tapınağı (Mısır), Mezopotamya ve antik Akdeniz kalıntılarında rastlanan; yaratılışın zamansal ve mekânsal başlangıç ritmini simgeleyen evrensel arketip.',
+    esotericMeaningTr: 'Tüm canlıların aynı kozmik kaynaktan türediğini, yaşamın kesintisiz birbiriyle bağlantılı ağını ve koşulsuz birliği anlatan sakral şablon.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Evrensel bir doğa geometrisi olup herhangi bir din veya kabileye özgü değildir; saygıyla her kültürde kullanılabilir. Çemberlerin ovallik kazanmadan kusursuz daire formunda kalması esastır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 6', rationaleTr: 'Evrensel harmoni, koşulsuz sevgi ve aile/topluluk bağı rezonansı.' },
+      { module: 'CHAKRA', target: 'Kalp Çakrası (Anahata)', rationaleTr: 'Bütünlük, şefkat ve merkezlenme enerjisi.' },
+      { module: 'ARCHETYPE', target: 'Bakıcı & Şifacı', rationaleTr: 'Kapsayıcılık ve yaşamı besleme potansiyeli.' },
+    ],
   },
+
   'seed-of-life': {
     id: 'seed-of-life',
     name: 'Yaşam Tohumu',
@@ -51,7 +86,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['WRIST_INNER', 'COLLARBONE', 'FOREARM_INNER'],
     },
+    visualDescriptionTr: 'Merkezi bir dairenin etrafında tam simetrik olarak yerleşen altı dairenin kesişiminden doğan yedi halkalı çekirdek çiçek formu.',
+    geometricStructureTr: 'Yedi çemberin birbirine teğet ve merkez kesişimlerinden oluşan, Yaşam Çiçeği\'nin temel embriyonik çekirdeği olan 6 katlı radyal simetri.',
+    traditionalMeaningTr: 'Yaratılışın ilk yedi evresini simgeleyen, doğurganlık, başlangıç tohumu ve kozmik doğuşu temsil eden kadim geometrik form.',
+    esotericMeaningTr: 'Bireyin içindeki saf potansiyeli, henüz filizlenmemiş yetenekleri ve yeni bir yaşam döngüsünün bereketli başlangıç noktasını ifade eder.',
+    compositionRole: 'ACCENT_DETAIL',
+    culturalGuidelinesTr: 'Yalın ve kompakt yapısı sayesinde bilek, köprücük kemiği gibi dar anatomik düzlemlere uygundur. Çizgiler arasındaki 1.5 mm asgari mesafe korunmalıdır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 9', rationaleTr: 'Her döngünün sonundan doğan yeni tohum ve başlangıç bilinci.' },
+      { module: 'CHAKRA', target: 'Sakral Çakra (Svadhisthana)', rationaleTr: 'Yaratıcı tohum, üretkenlik ve yaşam sevinci.' },
+      { module: 'ARCHETYPE', target: 'Masum & Yaratıcı', rationaleTr: 'Saf başlangıç ve saf niyet arketipi.' },
+    ],
   },
+
   'sri-yantra': {
     id: 'sri-yantra',
     name: 'Sri Yantra',
@@ -66,7 +113,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'DOTWORK',
       placementSuggestions: ['SPINE_CENTER', 'CHEST_CENTER', 'SHOULDER_BLADE'],
     },
+    visualDescriptionTr: 'Merkezi bir noktadan (Bindu) dışarıya doğru kesişen dokuz üçgen ve onları saran iki katmanlı lotus yaprakları ile koruyucu kare kapıdan oluşan karmaşık mistik diyagram.',
+    geometricStructureTr: 'Dördü yukarı (Shiva/eril ateş), beşi aşağı (Shakti/dişil su) yönelen 9 iç içe geçmiş ikizkenar üçgenin kesişimiyle oluşan 43 küçük üçgen ve eşmerkezli daireler.',
+    traditionalMeaningTr: 'Vedik felsefede ve Tantra geleneğinde kozmosun ve insan bedeninin ilahi enerjisini temsil eden en yüce Yantra; tanrıça Tripurasundari\'nin geometrik bedenidir.',
+    esotericMeaningTr: 'Eril ve dişil enerjilerin, niyet ile tezahürün mutlak dengesini ve dağınık bilincin tek bir aydınlanma noktasında toplanmasını temsil eder.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Vedik geleneğe göre kutsal kabul edilen derin bir tapınak geometrisidir. Üçgenlerin yönelimlerinin ters çevrilmemesi ve ayak bileği gibi zemin seviyesindeki bölgeler yerine gövdenin üst yarısına yerleştirilmesi tavsiye edilir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 9 & 1', rationaleTr: 'Kozmik tezahür, evrensel tamamlama ve irade odağı.' },
+      { module: 'CHAKRA', target: 'Solar Pleksus & Tepe', rationaleTr: 'İrade ateşi ile kozmik bilincin harmanlanması.' },
+      { module: 'ARCHETYPE', target: 'Büyücü & Hükümdar', rationaleTr: 'Düşünceyi maddeye dönüştürme simyası.' },
+    ],
   },
+
   'fibonacci-spiral': {
     id: 'fibonacci-spiral',
     name: 'Altın Oran Spirali (Fibonacci)',
@@ -81,7 +140,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'FOREARM_OUTER', 'RIBS_SIDE'],
     },
+    visualDescriptionTr: 'Büyüyen altın oranlı karelerin köşegen yaylarının birleşmesiyle sonsuza doğru genişleyen kusursuz logaritmik spiral eğrisi.',
+    geometricStructureTr: '1, 1, 2, 3, 5, 8, 13... sayı dizisiyle genişleyen karelerin yaylarıyla çizilen Phi (1.6180339...) altın oran logaritmik eğrisi.',
+    traditionalMeaningTr: 'Rönesans doğa matematiğinde ve antik kabuk, galaksi ve ayçiçeği dizilimlerinde gözlemlenen doğanın evrensel büyüme kanunu.',
+    esotericMeaningTr: 'Ruhun doğrusal değil döngüsel olarak tekamül ettiğini; her dönüşte daha yüksek bir bilinç seviyesine ulaşılarak genişlediğini anlatan evrim eğrisi.',
+    compositionRole: 'CONNECTIVE_FLOW',
+    culturalGuidelinesTr: 'Tamamen seküler ve matematiksel bir doğa sabiti olup evrenseldir. Dövmede kol veya gövde kaslarının doğal anatomik akış yönüyle uyumlu yönde kıvrılması estetik derinliği artırır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 5', rationaleTr: 'Dinamik değişim, macera, adaptasyon ve sürekli büyüme.' },
+      { module: 'ARCHETYPE', target: 'Gezgin & Yaratıcı', rationaleTr: 'Sınırları aşan akış ve özgür gelişim.' },
+      { module: 'ASTROLOGY', target: 'Hava & Değişken Nitelik', rationaleTr: 'Akışkan zeka ve esnek hareket kabiliyeti.' },
+    ],
   },
+
   'torus-field': {
     id: 'torus-field',
     name: 'Torus (Manyetik Yaşam Alanı)',
@@ -96,7 +167,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'DOTWORK',
       placementSuggestions: ['CHEST_CENTER', 'SHOULDER_BLADE'],
     },
+    visualDescriptionTr: 'Merkezindeki delikten kendi içine dönüp dışarıdan tekrar dolaşan simit benzeri dinamik girdap hatlarına sahip elektromanyetik enerji küresi.',
+    geometricStructureTr: 'Merkezi eksen etrafında dönen bir çemberin yüzey geometrisi; 3 boyutlu vortex matematiği ve kendi kendini besleyen sürekli kapalı topolojik manifold.',
+    traditionalMeaningTr: 'Kutsal geometride ve çağdaş kuantum modellerinde gezegenlerin, atomların ve insan aurasının sürekli enerji devridaim dinamiğini anlatan form.',
+    esotericMeaningTr: 'Bireyin dışarıdan bağımlı olmadan kendi enerjisini üretebilme gücünü, aurik koruma kalkanını ve tükenmeyen yaşam döngüsünü ifade eder.',
+    compositionRole: 'SECONDARY_LAYER',
+    culturalGuidelinesTr: 'Yüksek çizgi yoğunluğu içerdiğinden dotwork ve whip shading teknikleriyle, çizgilerin zamanla dağılmayacağı geniş düzlemlerde (sırt, göğüs) işlenmesi önerilir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 8', rationaleTr: 'Sonsuz devridaim, maddi ve ruhsal bolluk, dayanıklılık.' },
+      { module: 'CHAKRA', target: 'Tüm Aura Alanı', rationaleTr: 'Aurik kalkan ve manyetik bütünlük.' },
+      { module: 'ARCHETYPE', target: 'Hükümdar', rationaleTr: 'Kendi kendine yeten sarsılmaz güç alanı.' },
+    ],
   },
+
   'vesica-piscis': {
     id: 'vesica-piscis',
     name: 'Vesica Piscis (Kutsal Kesişim)',
@@ -111,9 +194,22 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'SINGLE_NEEDLE',
       placementSuggestions: ['WRIST_INNER', 'COLLARBONE', 'FOREARM_INNER'],
     },
+    visualDescriptionTr: 'İki özdeş dairenin merkezlerinin birbirinin çevresinden geçmesiyle ortada oluşan dik mercek (badem) şeklindeki kutsal kesişim alanı.',
+    geometricStructureTr: 'İki eş çemberin yarıçap mesafesinde kesişmesiyle elde edilen, √3 oranını ve geometrik olarak ışığın matematiksel doğuşunu barındıran mercek formu.',
+    traditionalMeaningTr: 'Pisagor mistisizminde \'Monad\'ın \'Dyad\'a (ikiliğe) bölünüşü; erken Hristiyan ve Kelt ikonografisinde kutsal portal ve dişil yaratıcı kapı.',
+    esotericMeaningTr: 'Zıt kutupların (eril-dişil, madde-ruh, bilinç-bilinçdışı) çatışmadan birleştiği kutsal temas noktası; yeni bir bilincin doğum portalı.',
+    compositionRole: 'ACCENT_DETAIL',
+    culturalGuidelinesTr: 'Sade iki daire ve orta mercekten oluştuğu için minimalizm ve tek iğne işçiliğine çok uygundur. Genellikle dikey eksende dengelenmesi önerilir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 2', rationaleTr: 'İkili denge, empati, diplomasi ve sezgisel köprü.' },
+      { module: 'CHAKRA', target: 'Sakral & Üçüncü Göz', rationaleTr: 'Kutupların dengelenmesi ve sezgisel portal.' },
+      { module: 'ARCHETYPE', target: 'Aşık & Dost', rationaleTr: 'Birlik ve derin bağ kurma arketipi.' },
+    ],
   },
 
+  // ==========================================
   // 2. GÖKSEL VE ASTRONOMİK (CELESTIAL_ASTRONOMY)
+  // ==========================================
   'sun-glyph-corona': {
     id: 'sun-glyph-corona',
     name: 'Güneş Glifi & Korona Işınları',
@@ -128,7 +224,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'CHEST_CENTER', 'UPPER_ARM_BICEP'],
     },
+    visualDescriptionTr: 'Merkezinde belirgin bir odak noktası olan çember ve çevresinden dışa doğru yayılan ince geometrik korona ışınları.',
+    geometricStructureTr: 'Merkezi nokta (Bindu), eşmerkezli daire ve radyal olarak eşit açılarla yayılan ışın vektörleri.',
+    traditionalMeaningTr: 'Batı astrolojisinde ve simyasında Güneş\'in (Sol) kadim glifi; aynı zamanda altının, canlılığın ve egonun bilinçli merkezinin simgesi.',
+    esotericMeaningTr: 'Bireyin gerçek özbenliğini, yaşam amacını, iradesini ve karanlığı aydınlatan içsel tükenmez ışık kaynağını temsil eder.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Güneş glifi evrensel bir göksel semboldür. Işınların asimetrik değil dengeli dağılması, merkez noktasının net bırakılması tavsiye edilir.',
+    analysisAssociations: [
+      { module: 'ASTROLOGY', target: 'Güneş Burcu (Tüm Burçlar)', rationaleTr: 'Kozmik irade, özbenlik ve doğum anındaki Güneş konumu.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 1', rationaleTr: 'Öncülük, tekillik ve güçlü bireysel irade.' },
+      { module: 'CHAKRA', target: 'Solar Pleksus (Manipura)', rationaleTr: 'İçsel ateş, özgüven ve canlılık.' },
+    ],
   },
+
   'moon-phases-crescent': {
     id: 'moon-phases-crescent',
     name: 'Hilal & Ay Evreleri Dizilimi',
@@ -143,7 +251,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['SPINE_CENTER', 'FOREARM_INNER', 'COLLARBONE'],
     },
+    visualDescriptionTr: 'Büyüyen hilalden dolunaya ve küçülen hilale uzanan üçlü ay evresi dizilimi.',
+    geometricStructureTr: 'İki küresel izdüşümün kesişim yaylarından oluşan hilal geometrisi ve dairesel ay evreleri sekansı.',
+    traditionalMeaningTr: 'Kadim Anadolu, Helenistik ve Neopagan kültürlerde Üçlü Tanrıça (Bakire, Anne, Yaşlı Bilge) ve ritmik zaman ölçüsü.',
+    esotericMeaningTr: 'Duyguların, sezgilerin ve bilinçdışının döngüsel ritmi; hiçbir şeyin sabit kalmadığını ve her düşüşün yeni bir doğuş getirdiğini simgeler.',
+    compositionRole: 'SECONDARY_LAYER',
+    culturalGuidelinesTr: 'Hilalin uçlarının yukarı veya kompozisyonun iç eksenine yönelmesi psikolojik olarak yükseliş hissini pekiştirir. Omurga veya ön kol dikey eksenine çok uygundur.',
+    analysisAssociations: [
+      { module: 'ASTROLOGY', target: 'Ay Burcu (Tüm Burçlar)', rationaleTr: 'Duygusal derinlik, annelik arketipleri ve içsel sezgi ritmi.' },
+      { module: 'CHAKRA', target: 'Sakral Çakra', rationaleTr: 'Su elementi, akışkanlık ve duygusal arınma.' },
+      { module: 'ARCHETYPE', target: 'Gizemli Bilge & Şefkatli Anne', rationaleTr: 'Sezgisel bilgelik ve dişil güç.' },
+    ],
   },
+
   'polaris-compass': {
     id: 'polaris-compass',
     name: 'Kutup Yıldızı & Göksel Pusula',
@@ -158,7 +278,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'WRIST_INNER', 'CALF'],
     },
+    visualDescriptionTr: 'Dört ana ve dört ara yöne sivrilen geometrik yıldız ve onu çevreleyen ince pusula kadranı çizgileri.',
+    geometricStructureTr: 'Sekizgen (oktagonal) simetri, 45 ve 90 derecelik yön vektörleri ve radyal koordinat halkaları.',
+    traditionalMeaningTr: 'Antik denizcilerin kuzeyi bularak rotalarını korumalarını sağlayan gökyüzünün sabit ekseni; Kutup Yıldızı ve kadim pusula gülü.',
+    esotericMeaningTr: 'Kaosun ve fırtınaların ortasında kaybolmayan içsel ahlaki pusula; ruhun kendi hakiki kuzeyine sadık kalma kararlılığı.',
+    compositionRole: 'SECONDARY_LAYER',
+    culturalGuidelinesTr: 'Doğrudan bir yön gösterici olduğu için vücut üzerinde eğri değil, anatomik düzlemle hizalı (dik) yerleştirilmesi tavsiye edilir.',
+    analysisAssociations: [
+      { module: 'ASTROLOGY', target: 'Yükselen Burç (ASC)', rationaleTr: 'Dünyaya açılan doğu ufku pusulası ve yaşam rotası.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 7', rationaleTr: 'Hakikat arayışı ve içsel ruhsal rehberlik.' },
+      { module: 'ARCHETYPE', target: 'Rehber & Kaşif', rationaleTr: 'Yol gösterme ve istikamet belirleme gücü.' },
+    ],
   },
+
   'lunar-eclipse-halo': {
     id: 'lunar-eclipse-halo',
     name: 'Gölge Ay Tutulması Halkası',
@@ -173,7 +305,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'DOTWORK',
       placementSuggestions: ['UPPER_ARM_BICEP', 'SHOULDER_BLADE'],
     },
+    visualDescriptionTr: 'Karanlık bir disk etrafından taşan ince koronal ışık halesi ve gölge geçiş çemberi.',
+    geometricStructureTr: 'İki farklı çapta konsantrik diskin ışık-gölge kontrastıyla oluşturduğu negatif korona alanı.',
+    traditionalMeaningTr: 'Kadim ezoterik astrolojide gölgenin ışığı geçici olarak örtmesi; karmik hesaplaşma, gizli olanın açığa çıkması ve büyük döngü sonu.',
+    esotericMeaningTr: 'Carl Jung psikolojisindeki gölge entegrasyonu; bireyin karanlık ve bastırılmış yönlerini reddetmek yerine ışığa kavuşturup bütünleşmesini simgeler.',
+    compositionRole: 'SECONDARY_LAYER',
+    culturalGuidelinesTr: 'Ağır siyah kütleler yerine ince dotwork gölgeleme ile ten nefes alanı korunarak işlenmelidir.',
+    analysisAssociations: [
+      { module: 'ARCHETYPE', target: 'Gölge Arketip Dönüşümü', rationaleTr: 'Gölge yönün farkındalıkla kucaklanıp simyasal dönüşümü.' },
+      { module: 'CHAKRA', target: 'Kök & Tepe Kesişimi', rationaleTr: 'Karanlıktan aydınlığa geçiş eşiği.' },
+      { module: 'ASTROLOGY', target: 'Ay Düğümleri / Tutulmalar', rationaleTr: 'Karmik gelişim ve sıçrama eşiği.' },
+    ],
   },
+
   'planetary-orbital-rings': {
     id: 'planetary-orbital-rings',
     name: 'Gezegensel Yörünge Halkaları',
@@ -188,9 +332,22 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_OUTER', 'SPINE_CENTER'],
     },
+    visualDescriptionTr: 'Merkezi bir odağın çevresinde farklı eğim açılarıyla dönen ince eliptik yörünge yayları ve nokta gezegenler.',
+    geometricStructureTr: 'Farklı odak uzaklıklarına ve eksen eğikliklerine sahip elipslerin oluşturduğu 3 boyutlu derinlikli yörünge projeksiyonu.',
+    traditionalMeaningTr: 'Kopernik ve Kepler kozmolojisinde gezegenlerin göksel ahengi; Antik Yunan\'da \'Kürelerin Müziği\' felsefesi.',
+    esotericMeaningTr: 'Her deneyimin ve insanın kendi yörüngesinde aktığını, evrendeki hiçbir karşılaşmanın tesadüf olmadığını ve kozmik senkronizasyonu anlatır.',
+    compositionRole: 'CONNECTIVE_FLOW',
+    culturalGuidelinesTr: 'Kompozisyondaki farklı sembolleri birbirine bağlayan ince bağlayıcı hatlar olarak mükemmel işlev görür.',
+    analysisAssociations: [
+      { module: 'ASTROLOGY', target: '10 Gezegen Yerleşimi', rationaleTr: 'Gezegenlerin ekliptik üzerindeki kozmik dansı.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 5 & 8', rationaleTr: 'Kozmik döngüsellik ve hareketlilik.' },
+      { module: 'ARCHETYPE', target: 'Mistik & Bilim İnsanı', rationaleTr: 'Evrensel düzene hayranlık ve uyum.' },
+    ],
   },
 
+  // ==========================================
   // 3. KADİM GLİFLER VE SİMYA (ANCIENT_GLYPHIC)
+  // ==========================================
   'ankh-key': {
     id: 'ankh-key',
     name: 'Ankh (Yaşam Anahtarı)',
@@ -205,7 +362,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'RIBS_SIDE', 'WRIST_INNER'],
     },
+    visualDescriptionTr: 'Üst kısmı damla/elips şeklinde bir halka, alt kısmı ise düz T biçimli kollardan oluşan kadim yaşam haçı.',
+    geometricStructureTr: 'Üstte kapalı döngü (sonsuzluk/rahim) ve altta dikey ve yatay kesişen doğrusal eksen (maddi düzlem) bileşimi.',
+    traditionalMeaningTr: 'Antik Mısır tapınak kabartmalarında tanrıların firavunlara sunduğu \'Crux Ansata\'; ebedi yaşam, nefes ve ilahi hayat gücü.',
+    esotericMeaningTr: 'Maddi ölümün ötesinde devam eden ruhsal varoluşu, eril ve dişil ilkelerin kutsal birleşimini ve yaşam enerjisini simgeler.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Antik Mısır mirası olup kutsal bir mühürdür; aşağılayıcı veya deforme edici görsellerle birleştirilmemeli, dikey yönelimi korunmalıdır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 1 & 9', rationaleTr: 'Yaşam gücü, sonsuzluk ve başlangıç-son birliği.' },
+      { module: 'CHAKRA', target: 'Kalp & Boğaz', rationaleTr: 'Hayat nefesi ve ruhsal canlılık.' },
+      { module: 'ARCHETYPE', target: 'Şifacı & Hükümdar', rationaleTr: 'Yaşam bahşetme ve dayanıklılık.' },
+    ],
   },
+
   'eye-of-horus': {
     id: 'eye-of-horus',
     name: "Horus'un Gözü (Wadjet)",
@@ -220,7 +389,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'COLLARBONE', 'WRIST_INNER'],
     },
+    visualDescriptionTr: 'Şahin gözü anatomisiyle insan gözünün birleşimi; kaş, gözbebeği, alt gözyaşı çizgisi ve spiral kıvrımdan oluşan glif.',
+    geometricStructureTr: 'Eski Mısır kesir sisteminde 1/2, 1/4, 1/8, 1/16, 1/32 ve 1/64 matematiksel oranlarını temsil eden 6 parçalı geometrik kompozisyon.',
+    traditionalMeaningTr: 'Osiris mitinde Seth ile savaşta parçalanıp Thoth tarafından şifayla birleştirilen Horus\'un sol gözü (Wadjet); şifa, bütünlük ve nazar koruması.',
+    esotericMeaningTr: 'Fiziksel sınırların ötesini gören üçüncü göz sezgisi; parçalanmış olanın yeniden tamlığa kavuşması ve ruhsal kalkan.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Sol göz (Wadjet) Ay ve şifa ile, sağ göz (Ra\'nın Gözü) Güneş ve güç ile ilişkilidir. Kompozisyonda sol gözün şifa ve içsel koruma rolü vurgulanır.',
+    analysisAssociations: [
+      { module: 'CHAKRA', target: 'Üçüncü Göz (Ajna)', rationaleTr: 'Berrak içgörü, sezgisel vizyon ve algı keskinliği.' },
+      { module: 'ARCHETYPE', target: 'Savaşçı & Bilge', rationaleTr: 'Yaralanıp daha güçlü ayağa kalkma simgesi.' },
+      { module: 'TOTEM', target: 'Şahin / Kartal / Baykuş', rationaleTr: 'Yüksekten gören şahin gözü ve berrak vizyon.' },
+    ],
   },
+
   'triskele-spiral': {
     id: 'triskele-spiral',
     name: 'Triskele (Üçlü Kelt Spirali)',
@@ -235,7 +416,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['WRIST_INNER', 'CALF', 'FOREARM_INNER'],
     },
+    visualDescriptionTr: 'Ortak bir merkezden dışarıya doğru saat yönünde kıvrılan üç eşit spiral koldan oluşan dinamik form.',
+    geometricStructureTr: '120 derecelik açısal aralıklarla merkezden fışkıran 3 adet Arşimet veya logaritmik spiral kolun oluşturduğu dönel simetri.',
+    traditionalMeaningTr: 'Neolitik Newgrange mezarlarında ve Kelt sanatında rastlanan; geçmiş-şimdi-gelecek ve su-toprak-hava üçlemeleri.',
+    esotericMeaningTr: 'Sürekli hareket halinde olan evrensel devinimi; beden-zihin-ruh entegrasyonunu ve duraksamayan kişisel evrimi ifade eder.',
+    compositionRole: 'ACCENT_DETAIL',
+    culturalGuidelinesTr: 'Kelt ve neolitik Avrupa mirasıdır. Üç kolun eşit uzunlukta ve akışkan olması dinamizmini korur; küçük ve orta ölçekli dövmelerde yüksek netlik sağlar.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 3', rationaleTr: 'Üçlü yaratıcı ifade, neşe, iletişim ve döngüsellik.' },
+      { module: 'CHAKRA', target: 'Boğaz Çakrası (Vishuddha)', rationaleTr: 'İfade akışı ve dinamik dışavurum.' },
+      { module: 'ARCHETYPE', target: 'Yaratıcı & Değişim Öncüsü', rationaleTr: 'Sürekli hareket ve dönüşüm.' },
+    ],
   },
+
   'tree-of-life-yggdrasil': {
     id: 'tree-of-life-yggdrasil',
     name: 'Yaşam Ağacı (Yggdrasil Geometrisi)',
@@ -250,7 +443,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'DOTWORK',
       placementSuggestions: ['SPINE_CENTER', 'SHOULDER_BLADE', 'CALF'],
     },
+    visualDescriptionTr: 'Dalları yukarıya, kökleri aşağıya doğru ayna simetrisiyle yayılan, gövdesi merkezde dik duran kutsal dünya ağacı.',
+    geometricStructureTr: 'Kökte ve taçta fraktal dallanma geometrisi; yer ve gök arasında dikey Axis Mundi (Dünya Ekseni) simetrisi.',
+    traditionalMeaningTr: 'İskandinav mitolojisinde dokuz diyarı birbirine bağlayan Yggdrasil; Mezopotamya ve Şamanizmde gökyüzü ile yeraltı arasındaki kutsal köprü.',
+    esotericMeaningTr: 'Derin köklenmenin yüksek dallanmayı getirdiği hakikati; atalarla ve geçmişle kurulan bağın gelecekteki ruhsal meyveleri beslemesini simgeler.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Dövmede köklerin ve dalların dengeli olması önemlidir; yalnızca dallara odaklanıp kökleri ihmal etmek sembolün topraklanma anlamını zayıflatır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 7 & 4', rationaleTr: 'Kök bilgelik, araştırma, sağlam zemin ve derinlik.' },
+      { module: 'CHAKRA', target: 'Kök Çakra (Muladhara)', rationaleTr: 'Topraklanma, sarsılmazlık ve kök salma.' },
+      { module: 'ARCHETYPE', target: 'Bilge & Hükümdar', rationaleTr: 'Köklü bilgelik ve koruyucu sığınak.' },
+    ],
   },
+
   'alchemy-four-elements': {
     id: 'alchemy-four-elements',
     name: 'Simyasal Dört Element Mührü',
@@ -265,7 +470,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'WRIST_INNER', 'RIBS_SIDE'],
     },
+    visualDescriptionTr: 'Düz üçgen (Ateş), ters üçgen (Su), çizgili düz üçgen (Hava) ve çizgili ters üçgenin (Toprak) birleştiği simyasal tetrahedron mührü.',
+    geometricStructureTr: 'Eşkenar üçgenlerin dikey oryantasyonları ve yatay kesme çizgileriyle oluşturulan dörtlü geometrik kombinasyon.',
+    traditionalMeaningTr: 'Hermetik gelenek ve Rönesans simyasında doğadaki tüm maddelerin yapı taşı olan 4 element ve onların saflaştırılması (Magnum Opus).',
+    esotericMeaningTr: 'Bireyin içindeki tutku (ateş), duygu (su), zihin (hava) ve eylemin (toprak) dengelenerek altın bilince dönüştürülmesi simyasıdır.',
+    compositionRole: 'SECONDARY_LAYER',
+    culturalGuidelinesTr: 'Simyasal hiyerarşide elementlerin yönelimleri (ateş yukarı, su aşağı) sabit kurallara bağlıdır; yönlerin karıştırılmaması gerekir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 4', rationaleTr: 'Dört elementin kararlı dengesi ve sağlam inşa kabiliyeti.' },
+      { module: 'CHAKRA', target: 'Dört Alt Çakra Dengesi', rationaleTr: 'Elementel uyum ve enerji dengesi.' },
+      { module: 'ARCHETYPE', target: 'Büyücü & Simyacı', rationaleTr: 'Dönüşüm ve ham maddeden cevher çıkarma.' },
+    ],
   },
+
   'uroboros-infinity': {
     id: 'uroboros-infinity',
     name: 'Ouroboros (Kozmik Döngü Mührü)',
@@ -280,9 +497,22 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'UPPER_ARM_BICEP'],
     },
+    visualDescriptionTr: 'Kendi kuyruğunu ağzıyla tutan, dairesel veya sonsuzluk (lemniskat) biçiminde kıvrılan geometrik yılan/ejderha halkası.',
+    geometricStructureTr: 'Dairesel veya 8 (lemniskat) formunda kapalı kavisli hat; sürekli başlangıcı sonuna bağlayan tekil döngü.',
+    traditionalMeaningTr: 'Antik Mısır cenaze metinlerinde ve İskenderiye simyasında evrenin ezeli ve ebedi döngüselliği; doğanın kendini sürekli yok edip yeniden yaratması.',
+    esotericMeaningTr: 'Hiçbir şeyin gerçekten kaybolmadığını; acıların, kayıpların ve sonların kaçınılmaz olarak yeni bir doğumun hazırlığı olduğunu ifade eder.',
+    compositionRole: 'BACKGROUND_FRAME',
+    culturalGuidelinesTr: 'Yılan figürü doğrudan saldırgan bir hayvan olarak değil, geometrik ve soyut bir döngü mührü olarak işlenmelidir. Korkutucu değil dingin döngü hissi vermelidir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 8', rationaleTr: 'Sonsuzluk döngüsü, karmanın yasası ve kalıcı güç.' },
+      { module: 'ARCHETYPE', target: 'Gölge Dönüşümü', rationaleTr: 'Eski kimliği bırakıp kabuk değiştirerek yenilenme.' },
+      { module: 'TOTEM', target: 'Yılan / Ejderha', rationaleTr: 'Dönüşüm ve yenilenme rezonansı.' },
+    ],
   },
 
+  // ==========================================
   // 4. ORGANİK VE DOĞAL (ORGANIC_NATURAL)
+  // ==========================================
   'sacred-lotus-anahata': {
     id: 'sacred-lotus-anahata',
     name: '12 Yapraklı Kalp Lotusu',
@@ -297,7 +527,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['CHEST_CENTER', 'FOREARM_INNER', 'COLLARBONE'],
     },
+    visualDescriptionTr: 'Simetrik olarak katman katman açılan yaprakları ve merkezinde küçük geometrik tohumu olan nilüfer çiçeği formu.',
+    geometricStructureTr: 'Merkezi eksen etrafında dikey simetrik katmanlanan 12 yapraklı açılım geometrisi (Kalp çakrası yantrası yaprak sayısı).',
+    traditionalMeaningTr: 'Hinduizm, Budizm ve Kadim Mısır\'da çamurlu ve bulanık sulardan doğup tertemiz açan saf bilincin ve ilahi güzelliğin sembolü.',
+    esotericMeaningTr: 'Hayatın en zorlu koşullarının ve acılarının bile saf bir şefkate, zarafete ve aydınlanmaya dönüştürülebileceği inancı.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Özellikle Doğu felsefesinde kutsal sayılan bir çiçektir. Ayak tabanı veya saygısız alanlar yerine kalp hizası, sırt veya kolda konumlandırılması anlamıyla tam örtüşür.',
+    analysisAssociations: [
+      { module: 'CHAKRA', target: 'Kalp Çakrası (Anahata)', rationaleTr: '12 yapraklı kalp enerjisi, sevgi ve koşulsuz şefkat.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 6', rationaleTr: 'Harmoni, estetik ve duygusal bütünlük.' },
+      { module: 'ARCHETYPE', target: 'Şifacı & Aşık', rationaleTr: 'Gönül açıklığı ve zarafet.' },
+    ],
   },
+
   'flowing-water-waves': {
     id: 'flowing-water-waves',
     name: 'Kutsal Akış Dalgaları',
@@ -312,7 +554,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'SINGLE_NEEDLE',
       placementSuggestions: ['FOREARM_OUTER', 'RIBS_SIDE', 'CALF'],
     },
+    visualDescriptionTr: 'Birbirini izleyen, yumuşak kavislerle kıvrılan ve kayaların etrafından dolanıyormuş hissi veren paralel su dalgası çizgileri.',
+    geometricStructureTr: 'Sinüzoidal dalga boyları, yumuşak eğriler ve ten boşluğuna nefes aldıran akışkan vektör hatları.',
+    traditionalMeaningTr: 'Taoist felsefede \'Wu Wei\' (eylemsizlik / çabasız akış); suyun yumuşaklığıyla en sert kayaları zamanla aşması metaforu.',
+    esotericMeaningTr: 'Hayatla savaşmak yerine onun akışına güvenmeyi, direnci bırakarak engelleri zarafetle aşmayı ve duygusal arınmayı temsil eder.',
+    compositionRole: 'CONNECTIVE_FLOW',
+    culturalGuidelinesTr: 'Kompozisyonda sert köşeli kutsal geometrileri yumuşatmak ve kas kıvrımlarıyla uyumlu bağlantılar kurmak için idealdir.',
+    analysisAssociations: [
+      { module: 'CHAKRA', target: 'Sakral Çakra', rationaleTr: 'Su elementi, esneklik ve arınma.' },
+      { module: 'ASTROLOGY', target: 'Su Burçları (Yengeç, Akrep, Balık)', rationaleTr: 'Duygusal derinlik ve sezgisel uyum.' },
+      { module: 'TOTEM', target: 'Yunus / Su Canlıları', rationaleTr: 'Akışkan neşe ve su elementel rehberliği.' },
+    ],
   },
+
   'obsidian-mountain-peak': {
     id: 'obsidian-mountain-peak',
     name: 'Obsidyen Zirve & Topraklanma Hattı',
@@ -327,7 +581,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'DOTWORK',
       placementSuggestions: ['CALF', 'FOREARM_OUTER', 'SHOULDER_BLADE'],
     },
+    visualDescriptionTr: 'Köşeli, fasetli kırılma hatlarına sahip dik dağ silüeti ve tabanda toprağa kenetlenen yatay ufuk çizgileri.',
+    geometricStructureTr: 'Açılı üçgen fasetler, kristalize prizmatik hatlar ve sağlam yatay taban düzlemi.',
+    traditionalMeaningTr: 'Şamanik kültürlerde ve yerli geleneklerde ruhun inzivaya çekildiği, gök ile yerin birleştiği sarsılmaz kutsal zirve.',
+    esotericMeaningTr: 'Dış dünyadaki fırtınalar karşısında savrulmayan içsel omurga, sarsılmaz kararlılık ve sağlam topraklanma gücü.',
+    compositionRole: 'BACKGROUND_FRAME',
+    culturalGuidelinesTr: 'Ağır ve karanlık bir kütle oluşturmaması için çizgi ve dotwork tonlamalarıyla nefes alan yüzeyler bırakılmalıdır.',
+    analysisAssociations: [
+      { module: 'CHAKRA', target: 'Kök Çakra', rationaleTr: 'Topraklanma, güvenlik ve sarsılmaz duruş.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 4', rationaleTr: 'Mukavemet, disiplin ve güvenilirlik.' },
+      { module: 'ARCHETYPE', target: 'Savaşçı & Koruyucu', rationaleTr: 'Yıkılmaz içsel kale.' },
+    ],
   },
+
   'celestial-cloud-vectors': {
     id: 'celestial-cloud-vectors',
     name: 'Kozmik Bulut Kıvrımları',
@@ -342,9 +608,22 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'COLLARBONE', 'RIBS_SIDE'],
     },
+    visualDescriptionTr: 'Hafif, rüzgarla süzülen spiral uçlu Asya tarzı göksel bulut kıvrımları ve hava akış çizgileri.',
+    geometricStructureTr: 'Altın oranlı spiral kıvrımların bulut formunda ritmik tekrarı ve yumuşak kıvrımlı hatlar.',
+    traditionalMeaningTr: 'Kadim Asya sanatında ve Budist ikonografide göksel varlıkların ve ruhsal aydınlanmanın hafiflik metaforu.',
+    esotericMeaningTr: 'Zihnin aşırı ağırlığından, takıntılardan ve endişelerden kurtularak hafiflemeyi; düşüncelerin bulutlar gibi gelip geçmesine izin vermeyi simgeler.',
+    compositionRole: 'CONNECTIVE_FLOW',
+    culturalGuidelinesTr: 'Dövmede ana sembollerin etrafını saran hava ve eter boşluğu (negatif alan) oluşturmak için mükemmel bir yardımcı katmandır.',
+    analysisAssociations: [
+      { module: 'CHAKRA', target: 'Boğaz & Taç', rationaleTr: 'Hava ve eter elementi, zihinsel berraklık.' },
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 5', rationaleTr: 'Özgürlük, hafiflik ve seyahat.' },
+      { module: 'TOTEM', target: 'Şahin / Kartal / Kuşlar', rationaleTr: 'Göksel yükseklik ve geniş perspektif.' },
+    ],
   },
 
+  // ==========================================
   // 5. SOYUT VE MİNİMAL (ABSTRACT_MINIMAL)
+  // ==========================================
   'enso-circle': {
     id: 'enso-circle',
     name: 'Ensō (Aydınlanma Çemberi)',
@@ -359,7 +638,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'SINGLE_NEEDLE',
       placementSuggestions: ['WRIST_INNER', 'FOREARM_INNER', 'UPPER_ARM_BICEP'],
     },
+    visualDescriptionTr: 'Tek bir fırça darbesiyle çizilmiş, ucu hafifçe açık bırakılmış organik ve minimalist Zen çemberi.',
+    geometricStructureTr: 'Ucu birleşmeyen, kalınlık değişkenliği gösteren dairesel hat; asimetrik mükemmellik (Wabi-Sabi) geometrisi.',
+    traditionalMeaningTr: 'Zen Budizminde tek bir nefeste ve zihni tüm düşüncelerden boşaltarak çizilen mutlak aydınlanma, evren ve boşluk (Mu) çemberi.',
+    esotericMeaningTr: 'Kusurluluğun içindeki zarafeti kabul etmeyi, kontrol arzusunu bırakıp şimdiki anın mükemmelliğine teslim olmayı anlatır.',
+    compositionRole: 'PRIMARY_CORE',
+    culturalGuidelinesTr: 'Zen felsefesine göre çemberin ucu bilerek açık bırakılır (sonsuz olasılıklara alan açmak için). Dövmede çemberin kapatılmaması esastır.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 7', rationaleTr: 'Derin içgörü, tefekkür ve dinginlik.' },
+      { module: 'CHAKRA', target: 'Tepe Çakrası & Boşluk', rationaleTr: 'Zihinsel sessizlik ve birlik hali.' },
+      { module: 'ARCHETYPE', target: 'Bilge & Keşiş', rationaleTr: 'Sadelik içinde tamlık.' },
+    ],
   },
+
   'bindu-focal-point': {
     id: 'bindu-focal-point',
     name: 'Bindu (Kaynak Noktası & Eksen)',
@@ -374,7 +665,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'SINGLE_NEEDLE',
       placementSuggestions: ['WRIST_INNER', 'COLLARBONE'],
     },
+    visualDescriptionTr: 'Tek başına veya ince konsantrik halkaların merkezinde yer alan yalın ve yoğunlaştırılmış odak noktası.',
+    geometricStructureTr: 'Boyutsuz matematiksel nokta; tüm çizgilerin doğduğu ve en sonunda geri döndüğü sıfır noktası geometrisi.',
+    traditionalMeaningTr: 'Vedik felsefede yaratılışın ilk tohumu, sonsuz enerjinin tek bir merkeze sıkıştığı kozmik başlangıç noktası.',
+    esotericMeaningTr: 'Dağılan zihinsel enerjiyi tek bir hedefe toplamayı, içsel dinginliği ve özün bölünemezliğini temsil eder.',
+    compositionRole: 'ACCENT_DETAIL',
+    culturalGuidelinesTr: 'Tek iğne (single needle) ve mikro dövme tarzı için idealdir; bilek iç kısımlarında veya köprücük kemiğinde sade bir pusula görevi görür.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 1', rationaleTr: 'Tekillik, merkezlenme ve başlangıç noktası.' },
+      { module: 'CHAKRA', target: 'Üçüncü Göz Merkezi', rationaleTr: 'Odaklanma ve içsel merkez.' },
+      { module: 'ARCHETYPE', target: 'Öncü', rationaleTr: 'Dağılmayan net hedef.' },
+    ],
   },
+
   'zen-dual-lines': {
     id: 'zen-dual-lines',
     name: 'Paralel Denge Hatları',
@@ -389,7 +692,19 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'WRIST_INNER'],
     },
+    visualDescriptionTr: 'Belli bir mesafeyle birbirine paralel olarak uzanan iki ince ve temiz minimalist çizgi.',
+    geometricStructureTr: 'Aralarında 2-3 mm sabit mesafe bulunan iki paralel doğrusal hat; Öklid geometrisinin kesişmeyen ikilisi.',
+    traditionalMeaningTr: 'Minimalist çağdaş sanat ve Doğu felsefesinde zıt kutupların (Yin-Yang, gece-gündüz) çatışmadan yan yana var oluşu.',
+    esotericMeaningTr: 'İlişkilerde ve bireyin kendi içinde özerklik ile birliktelik arasındaki sağlıklı mesafeyi ve sükuneti simgeler.',
+    compositionRole: 'CONNECTIVE_FLOW',
+    culturalGuidelinesTr: 'Çizgilerin titrememesi ve aralarındaki boşluğun ten nefesiyle dengelenmesi gerekir; ince kol bilek bantları veya ön kol hatları için idealdir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 2', rationaleTr: 'İkili denge, eşlik ve karşılıklı saygı.' },
+      { module: 'CHAKRA', target: 'Merkez Kanal (Sushumna) Kenarları', rationaleTr: 'İda ve Pingala dengesi.' },
+      { module: 'ARCHETYPE', target: 'Dost & Dengeleyici', rationaleTr: 'Uyum ve sessiz güç.' },
+    ],
   },
+
   'prism-triangle': {
     id: 'prism-triangle',
     name: 'Odak Prizması (Şeffaf Üçgen)',
@@ -404,6 +719,17 @@ export const MASTER_SYMBOLS: Record<string, SymbolDefinition> = {
       needleStyle: 'FINE_LINE',
       placementSuggestions: ['FOREARM_INNER', 'COLLARBONE'],
     },
+    visualDescriptionTr: 'Tabanı yere basan ince şeffaf bir eşkenar üçgen ve içerisinden kırılan ışık ekseni.',
+    geometricStructureTr: 'Eşkenar üçgen (60 derece iç açılar) ve ışığın optik kırılma açısını gösteren minimalist ışın doğrusu.',
+    traditionalMeaningTr: 'Optik fizikte ve simyada beyaz ışığı yedi renge ayıran kristal prizma; saklı olan potansiyelin görünür kılınması.',
+    esotericMeaningTr: 'Karmaşık ve dağınık düşünceleri net bir zihinsel kavrayışa dönüştürmeyi, gerçeği filtreleyip en saf haliyle görmeyi anlatır.',
+    compositionRole: 'ACCENT_DETAIL',
+    culturalGuidelinesTr: 'Üçgenin yukarı dönük olması yükselişi ve ateş/ışık prensibini temsil eder; yönünün baş aşağı çevrilmemesi tavsiye edilir.',
+    analysisAssociations: [
+      { module: 'NUMEROLOGY', target: 'Yaşam Yolu 3', rationaleTr: 'Işığın renklere ayrılması gibi yaratıcı dışavurum.' },
+      { module: 'CHAKRA', target: 'Üçüncü Göz & Boğaz', rationaleTr: 'Net algılama ve hakikati berrak ifade.' },
+      { module: 'ARCHETYPE', target: 'Sanatçı & Filozof', rationaleTr: 'Farkındalık ve netlik.' },
+    ],
   },
 };
 

@@ -19,13 +19,24 @@ import {
   Clock,
   ArrowLeft,
   X,
+  LayoutDashboard,
 } from 'lucide-react';
 
 type FilterType = 'ALL' | 'WITH_ANALYSIS' | 'WITH_RECIPE' | 'WITH_TESTS' | 'UNKNOWN_TIME';
 type SortType = 'NEWEST' | 'NAME_ASC' | 'NAME_DESC' | 'BIRTH_DATE';
 
 export const OwnerWorkspace: React.FC = () => {
-  const { clients, activeClient, activeClientId, setActiveClientId, activeClientArchive, setMode } = useApp();
+  const {
+    clients,
+    activeClient,
+    activeClientId,
+    setActiveClientId,
+    activeClientArchive,
+    setMode,
+    setCurrentRoute,
+    targetDetailTab,
+    setTargetDetailTab,
+  } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [sortBy, setSortBy] = useState<SortType>('NEWEST');
@@ -124,6 +135,15 @@ export const OwnerWorkspace: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
+            onClick={() => setCurrentRoute('DASHBOARD')}
+            className="px-3.5 py-2 text-xs font-semibold text-stone-300 hover:text-white bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <LayoutDashboard className="w-4 h-4 text-amber-400" />
+            <span>Ana Sayfaya Dön</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsNewClientModalOpen(true)}
             className="px-3.5 py-2 text-xs font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm shadow-amber-900/20 cursor-pointer"
           >
@@ -137,7 +157,7 @@ export const OwnerWorkspace: React.FC = () => {
             className="px-3.5 py-2 text-xs font-semibold text-stone-300 hover:text-white bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <FileText className="w-4 h-4 text-amber-400" />
-            <span>Danışan Formunu Önizle</span>
+            <span>Danışan Bilgi Formunu Önizle</span>
           </button>
         </div>
       </div>
@@ -439,12 +459,83 @@ export const OwnerWorkspace: React.FC = () => {
               )}
 
               {activeClient ? (
-                <ClientDetailCard client={activeClient} archive={activeClientArchive} />
+                <div>
+                  <div className="hidden lg:flex items-center justify-between pb-3 mb-2 border-b border-stone-800/60 text-xs">
+                    <span className="text-stone-400">
+                      Aktif Danışan: <strong className="text-stone-200">{activeClient.firstName} {activeClient.lastName}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveClientId(null)}
+                      className="text-stone-500 hover:text-amber-400 text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Seçimi Kaldır</span>
+                    </button>
+                  </div>
+                  <ClientDetailCard
+                    key={activeClient.id}
+                    client={activeClient}
+                    archive={activeClientArchive}
+                    initialTab={targetDetailTab || undefined}
+                    onBackToList={() => {
+                      setActiveClientId(null);
+                      setMobileTab('LIST');
+                    }}
+                  />
+                </div>
               ) : (
-                <div className="bg-stone-900/40 border border-stone-800 rounded-xl p-12 text-center text-stone-500 text-sm space-y-3">
-                  <Compass className="w-8 h-8 text-stone-600 mx-auto" />
-                  <p>Lütfen sol listeden incelemek ve üzerinde çalışmak istediğiniz bir danışan kaydını seçiniz.</p>
-                  <p className="text-xs text-stone-600">Her danışanın analizleri, test sonuçları ve dövme reçeteleri tamamen izole olarak açılacaktır.</p>
+                <div className="bg-stone-900/40 border border-stone-800 rounded-xl p-8 sm:p-12 text-center space-y-4">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-stone-950 border border-stone-800 flex items-center justify-center text-amber-400">
+                    <Compass className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md mx-auto">
+                    <h3 className="text-base font-semibold text-stone-200">
+                      {targetDetailTab === 'ANALYSES'
+                        ? 'Analiz Merkezi İçin Danışan Seçiniz'
+                        : targetDetailTab === 'RECIPE' || targetDetailTab === 'DESIGN'
+                        ? 'Dövme Sunumu & Rapor İçin Danışan Seçiniz'
+                        : targetDetailTab === 'RESULTS'
+                        ? 'Tasarım Raporları İçin Danışan Seçiniz'
+                        : targetDetailTab === 'SYMBOLS'
+                        ? 'Sembol Kompozisyonu İçin Danışan Seçiniz'
+                        : targetDetailTab === 'TESTS'
+                        ? 'Mizaç & Totem Testleri İçin Danışan Seçiniz'
+                        : 'Danışan Çalışma Alanı'}
+                    </h3>
+                    <p className="text-xs text-stone-400 leading-relaxed">
+                      {targetDetailTab === 'ANALYSES'
+                        ? 'Batı / Tropical astroloji haritası, numeroloji matrisi, 7 temel çakra ve 12 evrensel arketip analizlerini başlatmak veya incelemek için lütfen sol listeden bir danışan seçiniz.'
+                        : targetDetailTab === 'RECIPE'
+                        ? 'Danışanın analiz rezonansına dayalı matematiksel dövme reçetesi hazırlamak ve Midjourney görsel tasarım istemi sentezlemek için lütfen sol listeden bir danışan seçiniz.'
+                        : targetDetailTab === 'RESULTS'
+                        ? 'Danışanın dövme konsept dosyasını, teknik uygulama rehberini ve seans raporlarını inceleyip dışa aktarmak için lütfen sol listeden bir danışan seçiniz.'
+                        : targetDetailTab === 'SYMBOLS'
+                        ? 'Danışanın rezonansına uygun 26 kadim sembolü seçmek ve kompozisyon oluşturmak için lütfen sol listeden bir danışan seçiniz.'
+                        : targetDetailTab === 'TESTS'
+                        ? 'Danışanın Enneagram ve Hayvan Totemi testlerini çözmek ve sonuçlarını arşivlemek için lütfen sol listeden bir danışan seçiniz.'
+                        : 'Lütfen sol listeden incelemek ve üzerinde çalışmak istediğiniz bir danışan kaydını seçiniz. Her danışanın analizleri, test sonuçları ve dövme reçeteleri tamamen izole olarak açılacaktır.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsNewClientModalOpen(true)}
+                      className="px-3.5 py-2 text-xs font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm shadow-amber-900/20"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Yeni Danışan Ekle</span>
+                    </button>
+                    {targetDetailTab && (
+                      <button
+                        type="button"
+                        onClick={() => setTargetDetailTab(null)}
+                        className="px-3 py-2 text-xs text-stone-400 hover:text-stone-200 bg-stone-900 border border-stone-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Genel Görünüme Dön
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

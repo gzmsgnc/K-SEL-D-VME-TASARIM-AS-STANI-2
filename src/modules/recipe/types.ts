@@ -10,6 +10,13 @@ export type RecipeModuleStatus =
   | 'READY_TO_RUN'
   | 'COMPLETED';
 
+export interface RecipeSelectedSymbolInput {
+  symbolId: string;
+  symbolName: string;
+  customMeaning?: string;
+  weight: 'PRIMARY' | 'SECONDARY' | 'ACCENT';
+}
+
 export interface RecipeGenerationOptions {
   preferredStyle?: TattooStyle;
   preferredPlacement?: BodyPlacement;
@@ -17,6 +24,8 @@ export interface RecipeGenerationOptions {
   colorPreference?: TattooRecipe['colorProfile'];
   primarySymbol?: string;
   selectedSymbols?: string[];
+  accentSymbols?: string[];
+  selectedSymbolObjects?: RecipeSelectedSymbolInput[];
   excludedSymbols?: string[];
   includeTotemInVisual?: boolean; // Varsayılan: false (analiz-yalnızca)
   customNotes?: string;

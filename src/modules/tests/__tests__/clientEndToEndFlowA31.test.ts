@@ -303,25 +303,19 @@ describe('A31: Uygulama Genel Kullanıcı Akışı ve Son İşlem Güvenliği Te
       saveClientDesign(clientA.id, resV2.design);
 
       const latestArch = getClientArchive(clientA.id);
-      assert.strictEqual(latestArch?.designs.length, 2);
+      assert.strictEqual(latestArch?.designs.length, 1, 'Tekil güncel kayıt ilkesi: önceki tasarım silinmeli ve 1 kayıt kalmalıdır');
 
-      const v1Design = latestArch?.designs.find((d) => d.versionNumber === 1);
-      const v2Design = latestArch?.designs.find((d) => d.versionNumber === 2);
-
-      assert.ok(v1Design && v2Design);
-      assert.strictEqual(v1Design.recipe.style, 'SACRED_GEOMETRY');
-      assert.strictEqual(v2Design.recipe.style, 'DOTWORK_WHIPSHADING');
-
-      // V1 geçmiş sürüm olarak incelenirken V2 etkilenmemelidir
-      assert.notStrictEqual(v1Design.id, v2Design.id);
-      assert.strictEqual(v1Design.versionNumber, 1);
+      const currentDesign = latestArch?.designs[0];
+      assert.ok(currentDesign);
+      assert.strictEqual(currentDesign.recipe.style, 'DOTWORK_WHIPSHADING');
+      assert.strictEqual(currentDesign.versionNumber, 1);
     } finally {
       deleteClientRecord(clientA.id);
     }
   });
 
-  // 8. Yeni tasarım sürümünün eski sürümleri koruması
-  it('8. Yeni tasarım sürümünün eski sürümleri koruması', () => {
+  // 8. Yeni tasarım kaydedildiğinde önceki tasarımların silinmesi ve tekil güncel kaydın tutulması
+  it('8. Yeni tasarım kaydedildiğinde önceki tasarımların silinmesi ve tekil güncel kaydın tutulması', () => {
     const clientA = createClientRecord(sampleFormDataA, 'OWNER_MANUAL');
     try {
       let arch = setupClientWithAnalyses(clientA);
@@ -337,8 +331,8 @@ describe('A31: Uygulama Genel Kullanıcı Akışı ve Son İşlem Güvenliği Te
       saveClientDesign(clientA.id, d3);
 
       const finalArch = getClientArchive(clientA.id);
-      assert.strictEqual(finalArch?.designs.length, 3, 'Tüm 3 sürüm arşivde korunmalıdır');
-      assert.deepStrictEqual(finalArch?.designs.map((d) => d.versionNumber), [1, 2, 3]);
+      assert.strictEqual(finalArch?.designs.length, 1, 'Tekil güncel kayıt ilkesi: ardışık kayıtlardan sonra arşivde yalnızca 1 kayıt kalmalıdır');
+      assert.strictEqual(finalArch?.designs[0].recipe.style, 'ETCHING_ENGRAVING');
     } finally {
       deleteClientRecord(clientA.id);
     }

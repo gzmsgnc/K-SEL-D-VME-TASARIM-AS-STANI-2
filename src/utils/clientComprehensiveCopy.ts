@@ -16,7 +16,12 @@ import {
   formatConceptManifestoText,
   formatNegativePromptText,
 } from './tattooDesignFormatters';
-import { ENNEAGRAM_QUESTIONS, TOTEM_QUESTIONS, TOTEM_ANIMALS } from '../modules/tests';
+import {
+  ENNEAGRAM_QUESTIONS,
+  TOTEM_QUESTIONS,
+  TOTEM_ANIMALS,
+  computeTotemPriorityRankings,
+} from '../modules/tests';
 
 /**
  * A44 — Güvenli ve Çapraz Platform Pano Kopyalama Yardımcısı
@@ -73,11 +78,11 @@ export function formatClientPersonalInfoCopyText(client: Client): string {
     `Doğum Yeri       : ${loc?.placeName || (loc?.city ? `${loc.city}, ${loc.country}` : 'Belirtilmedi')}`,
     `Enlem / Boylam   : ${loc?.latitude !== undefined && loc?.latitude !== null ? `${Number(loc.latitude).toFixed(4)}° / ${Number(loc.longitude).toFixed(4)}°` : 'Belirtilmedi'}`,
     `Zaman Dilimi     : ${loc?.timezone || 'Europe/Istanbul'}`,
-    `Anne Adı         : ${client.motherName || 'Belirtilmedi'} (Yalnızca Ebced / Numeroloji altyapısı içindir, dövme sembolü olarak üretilmez)`,
+    `Anne Adı         : ${client.motherName || 'Belirtilmedi'} (Yalnızca Ebced hesaplaması içindir; astroloji, numeroloji, çakra, Enneagram, totem, sembol seçimi ve dövme görseline aktarılmaz)`,
   ];
 
   if (isTimeUnknown) {
-    lines.push(`Doğum Saati Notu : Doğum saati bilinmediği için Yükselen burç üretilmez; gezegen konumları için 12:00 öğle referansı kullanılmıştır.`);
+    lines.push(`Doğum Saati Notu : Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; bu durumda Yükselen burç sonucu kesin değildir (hesaplanamaz).`);
   }
 
   if (client.email) lines.push(`E-posta          : ${client.email}`);
@@ -262,24 +267,47 @@ export function formatTotemDetailedCopyText(
 
   if (!totemTest || !totemTest.primaryType || !totemTest.completedAt) {
     return [
+      `=== TOTEM HAYVANI ANALİZİ ===`,
+      `=== TOTEM MİZAÇ TESTİ VE GERÇEK CEVAPLARI ===`,
       `=== ŞAMANİK HAYVAN TOTEMİ TESTİ ===`,
-      `Danışan: ${client.firstName} ${client.lastName} (ID: ${client.id})`,
+      `Danışan adı: ${client.firstName} ${client.lastName}`,
+      `Danışan ID: ${client.id}`,
       `Durum: Test hazır / kullanıcı yanıtı bekleniyor.`,
       `Açıklama: Şamanik Hayvan Totemi testi henüz danışan tarafından cevaplanmamıştır. Sahte cevap veya varsayılan sonuç üretilmez.`,
     ].join('\n');
   }
 
-  const meta = TOTEM_ANIMALS[totemTest.primaryType];
-  const primaryScore = (totemTest.dominantScores && totemTest.primaryType)
-    ? totemTest.dominantScores[totemTest.primaryType]
-    : undefined;
+  const primaryMeta = TOTEM_ANIMALS[totemTest.primaryType];
+  const hasSecondary = Boolean(
+    totemTest.secondaryType &&
+    totemTest.secondaryType !== totemTest.primaryType &&
+    totemTest.secondaryType !== 'Tekil Ruh Rehberi'
+  );
+  const secondaryMeta = hasSecondary && totemTest.secondaryType ? TOTEM_ANIMALS[totemTest.secondaryType] : undefined;
+
+  const dominantScores = totemTest.dominantScores || {};
+  const primaryScore = dominantScores[totemTest.primaryType];
+  const secondaryScore = hasSecondary && totemTest.secondaryType ? dominantScores[totemTest.secondaryType] : undefined;
+
+  const totalScore = Object.values(dominantScores).reduce((sum, s) => sum + s, 0);
+
+  // Sıralama (Puan azalan sırada, eşitlikte Türkçe alfabetik)
+  const sortedAnimals = Object.entries(dominantScores).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0], 'tr');
+  });
 
   const lines: string[] = [
-    `=== TOTEM ANALİZİ ===`,
+    `=== TOTEM HAYVANI ANALİZİ ===`,
+    `=== TOTEM MİZAÇ TESTİ VE GERÇEK CEVAPLARI ===`,
     `=== ŞAMANİK HAYVAN TOTEMİ TESTİ VE GERÇEK CEVAPLARI ===`,
-    `Danışan: ${client.firstName} ${client.lastName} (ID: ${client.id})`,
-    `Test Sürümü: V${totemTest.version || 1}`,
-    `Tamamlanma Tarihi: ${new Date(totemTest.completedAt).toLocaleString('tr-TR')}`,
+    ``,
+    `Danışan adı: ${client.firstName} ${client.lastName}`,
+    `Danışan ID: ${client.id}`,
+    `Test sürümü: V${totemTest.version || 1}`,
+    `Tamamlanma tarihi: ${new Date(totemTest.completedAt).toLocaleString('tr-TR')}`,
+    ``,
+    `TEST SORULARI VE CEVAPLAR:`,
     ``,
   ];
 
@@ -298,28 +326,157 @@ export function formatTotemDetailedCopyText(
     lines.push(q.questionTr);
     lines.push(``);
     lines.push(`DANIŞANIN CEVABI:`);
-    lines.push(selectedOpt ? `${selectedOpt.textTr}  <-- [SEÇİLEN CEVAP]` : (selectedOptionId ? `${selectedOptionId}  <-- [SEÇİLEN CEVAP]` : '(Cevaplanmadı)'));
+    lines.push(
+      selectedOpt
+        ? `${selectedOpt.textTr}  <-- [SEÇİLEN CEVAP]`
+        : selectedOptionId
+        ? `${selectedOptionId}  <-- [SEÇİLEN CEVAP]`
+        : '(Cevaplanmadı)'
+    );
     lines.push(``);
   });
 
-  lines.push(`TOTEM SONUCU:`);
-  lines.push(`Birincil Totem: ${totemTest.primaryType}`);
-  lines.push(`Skor: ${primaryScore !== undefined ? `${primaryScore} puan` : '-'}`);
-  lines.push(`İkincil Totem: ${totemTest.secondaryType || 'Tekil Ruh Rehberi'}`);
-  lines.push(`Element: ${meta?.elementTr || 'Doğa'}`);
-  lines.push(`Ruhani Anlam: ${meta?.symbolicMeaningTr || 'Kişisel koruyucu rehberlik'}`);
-  lines.push(``);
-  lines.push(`[TOTEM PUAN DAĞILIMI]`);
-
-  if (totemTest.dominantScores) {
-    Object.entries(totemTest.dominantScores).forEach(([totem, score]) => {
-      lines.push(`• ${totem}: ${score} puan`);
-    });
+  lines.push(`TOTEM SONUÇLARI:`);
+  lines.push(`- Birincil totem hayvanı: ${totemTest.primaryType}${primaryScore !== undefined ? ` (${primaryScore} puan)` : ''}`);
+  if (hasSecondary && totemTest.secondaryType) {
+    lines.push(`- İkincil totem hayvanı: ${totemTest.secondaryType}${secondaryScore !== undefined ? ` (${secondaryScore} puan)` : ''}`);
+  } else {
+    lines.push(`- İkincil totem hayvanı: Bulunmuyor (Tekil ruh rehberi)`);
   }
+  lines.push(``);
+  lines.push(`- Kavramsal Ayrım (Mizaç Analizi vs Dövme Tasarımı Önceliği):`);
+  lines.push(`  • Mizaç Analizi: Danışanın psikolojik mizacını ve karakter eğilimlerini ifade eder (Baskın Totem: ${totemTest.primaryType}).`);
+  lines.push(`  • Dövme Tasarımı: Danışan onayına sunulacak sembolik rezonans ve kompozisyon öncelik sırasını ifade eder (Kural 18).`);
+  lines.push(``);
 
+  // A62 Tasarım Önceliklendirme ve İkincil Eşleştirme Sıralaması
+  const answersMapObj: Record<string, string> = {};
+  answersMap.forEach((val, key) => {
+    answersMapObj[key] = val;
+  });
+
+  const priorityRankings =
+    totemTest.totemPriorityRankings && totemTest.totemPriorityRankings.length > 0
+      ? totemTest.totemPriorityRankings
+      : computeTotemPriorityRankings(answersMapObj, dominantScores);
+
+  const positiveCandidates = priorityRankings.filter((item) => item.isDesignCandidate && item.rawScore > 0);
+  const zeroCandidates = priorityRankings.filter((item) => !item.isDesignCandidate || item.rawScore === 0);
+
+  lines.push(`- Tüm hayvanların puan dağılımı:`);
+  if (priorityRankings.length > 0) {
+    if (positiveCandidates.length > 0) {
+      lines.push(`  [Pozitif Puanlı Tasarım Adayları - Rezonans Toplamı: %100.0]`);
+      positiveCandidates.forEach((item) => {
+        lines.push(
+          `  • ${item.animal}: ${item.rawScore} puan (${item.percentageFormatted}) | Öncelik Puanı: ${item.priorityScore.toFixed(4)} [${item.roleLabelTr}]`
+        );
+      });
+    }
+    if (zeroCandidates.length > 0) {
+      lines.push(`  [Tasarım Önerisi Dışı (0 Ham Puan)]`);
+      zeroCandidates.forEach((item) => {
+        lines.push(
+          `  • ${item.animal}: 0 puan (%0.0) | Öncelik Puanı: 0.0000 [Tasarım Önerisi Dışı (0 Puan)]`
+        );
+      });
+    }
+  } else if (sortedAnimals.length > 0) {
+    sortedAnimals.forEach(([animal, score]) => {
+      const pct = totalScore > 0 ? ((score / totalScore) * 100).toFixed(1) : '0.0';
+      lines.push(`  • ${animal}: ${score} puan (%${pct})`);
+    });
+  } else {
+    lines.push(`  • Puan kaydı bulunmuyor`);
+  }
+  lines.push(``);
+
+  lines.push(`- Varsa yüzdelik skorları:`);
+  if (priorityRankings.length > 0) {
+    positiveCandidates.forEach((item) => {
+      lines.push(`  • ${item.animal}: ${item.percentageFormatted}`);
+    });
+    zeroCandidates.forEach((item) => {
+      lines.push(`  • ${item.animal}: %0.0 (Tasarım önerisi dışı)`);
+    });
+  } else if (sortedAnimals.length > 0) {
+    sortedAnimals.forEach(([animal, score]) => {
+      const pct = totalScore > 0 ? ((score / totalScore) * 100).toFixed(1) : '0.0';
+      lines.push(`  • ${animal}: %${pct}`);
+    });
+  } else {
+    lines.push(`  • Yüzdelik skor bulunmuyor`);
+  }
+  lines.push(``);
+
+  lines.push(`- Sonuç sıralaması:`);
+  if (priorityRankings.length > 0) {
+    priorityRankings.forEach((item) => {
+      if (item.isDesignCandidate && item.rawScore > 0) {
+        lines.push(
+          `  ${item.rank}. ${item.animal} (${item.rawScore} puan, ${item.percentageFormatted}) - Rol: ${item.roleLabelTr} [Öncelik Puanı: ${item.priorityScore.toFixed(4)}]`
+        );
+      } else {
+        lines.push(
+          `  ${item.rank}. ${item.animal} (0 puan, %0.0) - Rol: Tasarım Önerisi Dışı (0 Puan) [Öncelik Puanı: 0.0000]`
+        );
+      }
+    });
+  } else if (sortedAnimals.length > 0) {
+    sortedAnimals.forEach(([animal, score], idx) => {
+      const pct = totalScore > 0 ? ((score / totalScore) * 100).toFixed(1) : '0.0';
+      lines.push(`  ${idx + 1}. ${animal} (${score} puan, %${pct})`);
+    });
+  } else {
+    lines.push(`  Sıralama verisi bulunmuyor`);
+  }
+  lines.push(``);
+
+  lines.push(`- Dövme Tasarım Öncelik Durumu ve Danışan Onayı (Kural 18):`);
+  const topCandidate = positiveCandidates[0]?.animal || totemTest.primaryType;
+  const firstAlt = positiveCandidates[1]?.animal || (hasSecondary ? totemTest.secondaryType : 'Bulunmuyor');
+  lines.push(`  • Mizaç Analizi Baskın Hayvanı: ${totemTest.primaryType} (Karakter & Eğilim Boyutu)`);
+  lines.push(`  • Ana Tasarım Önceliği: ${topCandidate} (Dövme Kompozisyonu Birincil Öneri)`);
+  lines.push(`  • İlk Alternatif: ${firstAlt}`);
+  lines.push(
+    `  • Danışan Onay Durumu: ${
+      totemTest.selectedTotemAnimal
+        ? `Danışan Tarafından Tasarım İçin Onaylandı ve Seçildi (${totemTest.selectedTotemAnimal})`
+        : 'Danışan onayı bekleniyor (Danışan onayı olmadan dövme tasarımına dahil edilmez)'
+    }`
+  );
+  if (totemTest.rejectedTotemAnimals && totemTest.rejectedTotemAnimals.length > 0) {
+    lines.push(`  • Reddedilen Hayvanlar: ${totemTest.rejectedTotemAnimals.join(', ')}`);
+  }
+  lines.push(``);
+
+  lines.push(`MİZAÇ VE SEMBOLİK YORUM:`);
+  lines.push(`- Baskın hayvanın anlamı:`);
+  lines.push(`  • Hayvan: ${totemTest.primaryType}`);
+  lines.push(`  • Element: ${primaryMeta?.elementTr || 'Doğa'}`);
+  lines.push(`  • Temel Nitelik: ${primaryMeta?.coreTraitTr || '-'}`);
+  lines.push(`  • İçgüdüsel Rol: ${primaryMeta?.instinctiveRoleTr || '-'}`);
+  lines.push(`  • Sembolik Anlam: ${primaryMeta?.symbolicMeaningTr || '-'}`);
+  lines.push(``);
+
+  if (hasSecondary && totemTest.secondaryType) {
+    lines.push(`- İkincil hayvanın anlamı (${totemTest.secondaryType}):`);
+    lines.push(`  • Element: ${secondaryMeta?.elementTr || 'Doğa'}`);
+    lines.push(`  • Temel Nitelik: ${secondaryMeta?.coreTraitTr || '-'}`);
+    lines.push(`  • İçgüdüsel Rol: ${secondaryMeta?.instinctiveRoleTr || '-'}`);
+    lines.push(`  • Sembolik Anlam: ${secondaryMeta?.symbolicMeaningTr || '-'}`);
+  } else {
+    lines.push(`- İkincil hayvanın anlamı: İkincil totem bulunmamaktadır (Tekil rehber hayvan).`);
+  }
+  lines.push(``);
+
+  lines.push(`- Testin ürettiği mevcut yorumlar:`);
   if (totemTest.interpretations && totemTest.interpretations.length > 0) {
-    lines.push(``, `[TOTEM VE ŞAMANİK YORUMLAR]`);
-    totemTest.interpretations.forEach((i) => lines.push(`• ${i}`));
+    totemTest.interpretations.forEach((item) => {
+      lines.push(`  • ${item}`);
+    });
+  } else {
+    lines.push(`  • Özel yorum kaydı bulunmamaktadır.`);
   }
 
   return lines.join('\n');
@@ -354,7 +511,7 @@ export function formatBirthInfoSectionCopyText(
   ];
 
   if (isTimeUnknown) {
-    lines.push(`Doğum Saati Uyarısı: Doğum saati bilinmediği için Yükselen burç kesin olarak hesaplanamaz; gezegen konumları için 12:00 öğle referansı varsayımı kullanılmıştır.`);
+    lines.push(`Doğum Saati Uyarısı: Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; bu durumda Yükselen burç sonucu kesin değildir (hesaplanamaz).`);
   }
 
   if (astroData.hasRecord) {

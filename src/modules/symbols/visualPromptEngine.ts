@@ -53,11 +53,137 @@ function containsForbiddenWords(
   return false;
 }
 
+const KNOWN_ANIMAL_TERMS = [
+  'kurt', 'wolf', 'şahin', 'sahin', 'hawk', 'falcon', 'kartal', 'eagle',
+  'baykuş', 'baykus', 'owl', 'jaguar', 'ayı', 'ayi', 'bear',
+  'yılan', 'yilan', 'snake', 'serpent', 'geyik', 'deer', 'stag',
+  'yunus', 'dolphin', 'aslan', 'lion', 'kaplan', 'tiger', 'tilki', 'fox',
+  'at', 'horse', 'kedi', 'cat', 'köpek', 'dog', 'karga', 'crow', 'raven',
+];
+
+interface AbstractTotemMotif {
+  promptEn: string;
+  accentTr: string;
+}
+
+/**
+ * AŞAMA 5.4.0.1: Totem hayvanını doğrudan fiziksel biçimi, silüeti veya adıyla değil;
+ * temsil ettiği elementel ve arketipik anlamı bağımsız kutsal geometri ve soyut motiflerle ifade eder.
+ * Hayvan adı, silüeti, anatomisi, başı, gövdesi, kanadı veya kuyruğu ASLA kullanılmaz.
+ * Güvenli bir soyut karşılık bulunamazsa null döndürülerek ilgili görsel öğe dışarıda bırakılır.
+ */
+function resolveAbstractTotemMotif(totemName?: string): AbstractTotemMotif | null {
+  if (!totemName || !totemName.trim()) return null;
+  const clean = totemName.trim().toLocaleLowerCase('tr-TR');
+
+  if (clean.includes('yunus')) {
+    return {
+      promptEn: 'rhythmic flowing wave curves and fluid sinusoidal sacred line geometry',
+      accentTr: 'Ritmik akışkan dalga eğrileri ve sinüzoidal çizgi geometrisi',
+    };
+  }
+  if (clean.includes('şahin') || clean.includes('sahin')) {
+    return {
+      promptEn: 'ascending celestial chevron vectors and sharp radial perspective line geometry',
+      accentTr: 'Göksel açısal perspektif vektörleri ve odak geometrisi',
+    };
+  }
+  if (clean.includes('kartal')) {
+    return {
+      promptEn: 'ascending celestial vector rays and expansive solar geometric lattice',
+      accentTr: 'Yükselen göksel ışın vektörleri ve genişleyen güneş geometrisi',
+    };
+  }
+  if (clean.includes('baykuş') || clean.includes('baykus')) {
+    return {
+      promptEn: 'concentric focal perception rings with intersecting aperture geometry',
+      accentTr: 'Eşmerkezli odak halkaları ve kesişen diyafram geometrisi',
+    };
+  }
+  if (clean.includes('jaguar')) {
+    return {
+      promptEn: 'alchemical dynamic triangular energy vectors and interlocking sharp geometric lines',
+      accentTr: 'Dinamik üçgen enerji vektörleri ve keskin geometrik hatlar',
+    };
+  }
+  if (clean.includes('ayı') || clean.includes('ayi')) {
+    return {
+      promptEn: 'rooted vertical foundation pillar lattice and solid grounding geometric matrix',
+      accentTr: 'Köklenmiş dikey temel sütunu ve zemin kafes geometrisi',
+    };
+  }
+  if (clean.includes('yılan') || clean.includes('yilan')) {
+    return {
+      promptEn: 'concentric interlocking circular renewal loops and infinite cyclical vortex geometry',
+      accentTr: 'İç içe geçen dairesel döngü formları ve sonsuzluk girdap geometrisi',
+    };
+  }
+  if (clean.includes('kurt')) {
+    return {
+      promptEn: 'protective geometric boundary shield lattice with interlocking angle vectors',
+      accentTr: 'Koruyucu geometrik kalkan ve açısal sınır matrisi',
+    };
+  }
+  if (clean.includes('geyik')) {
+    return {
+      promptEn: 'delicate harmonious radial curve motifs and balance-centered organic lines',
+      accentTr: 'Ahenkli radyal eğri motifleri ve dengeleyici organik hatlar',
+    };
+  }
+
+  // Güvenli bir karşılık bulunamazsa hayvan figürü üretmek yerine görsel öğe dışarıda bırakılır
+  return null;
+}
+
+const TOTEM_ANIMAL_PAIRS: Record<string, string[]> = {
+  kurt: ['kurt', 'wolf'],
+  şahin: ['şahin', 'sahin', 'hawk', 'falcon'],
+  kartal: ['kartal', 'eagle'],
+  baykuş: ['baykuş', 'baykus', 'owl'],
+  jaguar: ['jaguar'],
+  ayı: ['ayı', 'ayi', 'bear'],
+  yılan: ['yılan', 'yilan', 'snake', 'serpent'],
+  geyik: ['geyik', 'deer', 'stag'],
+  yunus: ['yunus', 'dolphin'],
+};
+
+/**
+ * AŞAMA 5.4.0.1: Totem adı veya hayvan türünün negatif veya pozitif prompta sızmasını engeller.
+ * Eğer totemName belirtilmişse, ilgili hayvanın adı ve varyantları negatif prompta ASLA aktarılmaz.
+ */
+function isAnimalNameOrSpecies(term: string, totemName?: string): boolean {
+  if (!term) return false;
+  const cleanTr = term.trim().toLocaleLowerCase('tr-TR');
+  const cleanEn = term.trim().toLowerCase();
+
+  if (totemName && totemName.trim()) {
+    const totemTr = totemName.trim().toLocaleLowerCase('tr-TR');
+    if (
+      cleanTr === totemTr ||
+      cleanTr.includes(totemTr) ||
+      cleanTr.split(/\s+/).includes(totemTr)
+    ) {
+      return true;
+    }
+
+    for (const [key, variants] of Object.entries(TOTEM_ANIMAL_PAIRS)) {
+      if (totemTr.includes(key)) {
+        if (variants.some((v) => cleanTr === v || cleanTr.includes(v) || cleanEn.includes(v))) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * 10 Adımlı Veri Zincirini:
  * Danışan → Analiz sonuçları → A15 Dövme Reçetesi → Sembol seçimi → Hariç tutulan semboller
  * → Stil → Yerleşim → Kompozisyon → Teknik tasarım talimatı → Nihai görsel istem
- * sentezleyerek Midjourney / AI görsel üretim istemini ve Türkçe konsept manifestosunu üretir.
+ * sentezleyerek dövme sanatçısının inceleyebileceği, beyaz zemin üzerinde bağımsız
+ * dövme tasarım şablonu (tattoo stencil flash sheet) istemini ve Türkçe konsept manifestosunu üretir.
  */
 export function generateUnifiedVisualPrompt(
   input: VisualPromptGenerationInput
@@ -176,57 +302,79 @@ export function generateUnifiedVisualPrompt(
     }
   }
 
-  // 2. Totem Entegrasyonu (Kural 6, 7 & 10)
+  // 2. Totem Entegrasyonu (AŞAMA 5.4.0.1)
+  // Totem hayvanının adı, hayvan silüeti, anatomisi, başı, gövdesi, kanadı, kuyruğu veya tanınabilir fiziksel biçimi
+  // görsel prompta ASLA aktarılmaz. Totemin temsil ettiği anlam, bağımsız geometrik veya doğal soyut motiflerle ifade edilir.
+  // Güvenli bir soyut karşılık bulunamazsa ilgili görsel öğe tamamen dışarıda bırakılır.
   let totemVisualPromptClause = '';
   if (totemName && !containsForbiddenWords(totemName, excludedClean, motherName)) {
     if (includeTotemInVisual) {
-      // Kural 7 & 10: Doğrudan hayvan figürü/sticker değil, soyut/geometrik hat entegrasyonu
-      totemVisualPromptClause = `abstract minimalist geometric line silhouette of ${totemName} integrated into sacred geometry`;
-      accentSymbolItems.push(`Soyut ${totemName} geometrisi`);
+      const abstractMotif = resolveAbstractTotemMotif(totemName);
+      if (abstractMotif) {
+        totemVisualPromptClause = abstractMotif.promptEn;
+        accentSymbolItems.push(abstractMotif.accentTr);
+      }
     }
   }
 
-  // 3. Kompozisyon Hiyerarşisi
+  // 3. Kompozisyon Hiyerarşisi (Reçete Standartları: Nominal %65 Ana Odak, %35 İkincil Katman)
   const compositionHierarchy = [
-    `Merkezi Odak (Primary): ${primarySymbolItems.join(' & ')}`,
+    `Merkezi Odak (Primary - %65): ${primarySymbolItems.join(' & ')}`,
     secondarySymbolItems.length > 0
-      ? `Tamamlayıcı Katman (Secondary): ${secondarySymbolItems.slice(0, 3).join(' · ')}`
-      : 'Tamamlayıcı Katman: Dengeleyici kutsal oran çemberleri',
+      ? `Tamamlayıcı Katman (Secondary - %35): ${secondarySymbolItems.slice(0, 3).join(' · ')}`
+      : 'Tamamlayıcı Katman (%35): Dengeleyici kutsal oran çemberleri',
     accentSymbolItems.length > 0
       ? `İnce Detaylar (Accents): ${accentSymbolItems.slice(0, 3).join(' · ')}`
       : 'İnce Detaylar: Mikro yıldız ve glif aksanları',
     `Anatomik Akış: ${placementMeta.nameTr} (${placementMeta.anatomicalFlowTr})`,
   ];
 
-  // 4. Sanatçı Teknik Çizim Talimatları (Kural 13 & 14: Yalnızca teknik alanda)
+  // 4. Sanatçı Teknik Çizim Talimatları (Kural 13 & 14 & Reçete Standartları)
   const effectiveDimensions =
     recipe.recommendedDimensionsCm &&
     recipe.recommendedDimensionsCm.width > 0 &&
     recipe.recommendedDimensionsCm.height > 0
       ? recipe.recommendedDimensionsCm
-      : placementMeta.recommendedDimensions;
+      : (recipe.compositionMetrics?.idealDimensionsCm || { width: 22, height: 14 });
 
   const technicalDirectives: string[] = [
     `Stil: ${styleMeta.nameTr}`,
     `İğne ve Gölgeleme: ${styleMeta.needleRecommendationsTr.join(', ')}`,
-    `Çizgi Aralığı ve Nefes Alanı: ${styleMeta.lineSpacingAdviceTr}`,
+    `Çizgi Aralığı ve Nefes Alanı: Minimum 1.5 mm, ideal 2.0 mm çizgi aralığı korunmalıdır (${styleMeta.lineSpacingAdviceTr})`,
     `Blowout Önleme Uyarısı: ${styleMeta.antiBlowoutWarningTr}`,
-    `Önerilen Ebat: ${effectiveDimensions.width} cm x ${effectiveDimensions.height} cm`,
+    `Tasarım Ölçüleri: ${effectiveDimensions.width} cm x ${effectiveDimensions.height} cm (Minimum: 16x10 cm, İdeal: 22x14 cm)`,
     `Renk Profili: ${colorMeta.nameTr} (${colorMeta.rationaleTr})`,
-    'Ciltte minimum %30 temiz negatif alan bırakılarak uzun ömürlü pigment berraklığı korunmalıdır.',
+    'Kompozisyon Hiyerarşisi: Pozitif dövme alanında Ana Odak nominal %65, İkincil Tamamlayıcı Katman %35 oranında dengelenmelidir.',
+    'Negatif Alan Standardı: Ciltte pigment yığılması ve mürekkep patlamasını (blowout) önlemek için toplam yüzeyde hedef %45–50 temiz negatif alan bırakılmalıdır.',
   ];
 
-  // 5. Görsel İstem (Midjourney / AI Prompt Sentezi)
+  // 5. Görsel İstem (Midjourney / OpenAI GPT Image Sentezi)
+  // Aşama 5.4.0: Bağımsız Dövme Şablonu (Tattoo Stencil Flash Sheet) ve Saf Beyaz Arka Plan Direktifleri
+  const stencilDirectives = [
+    'standalone independent 2D vector tattoo stencil flash sheet design',
+    'isolated on pure solid white background, flat clean white backdrop',
+    'centered standalone composition, complete design with generous padding margins',
+    'no edge clipping, fully contained within frame boundaries',
+    'high contrast solid black ink lines, clean vector linework',
+    'sharp crisp separated lines with distinct boundaries, immaculate fine line definition',
+    'independent graphic design artwork, not applied on skin',
+  ];
+
   const promptSubjectParts = [
     primarySymbolItems[0],
     secondarySymbolItems.length > 0 ? secondarySymbolItems[0] : '',
     totemVisualPromptClause,
+    ...stencilDirectives,
     'sacred geometric harmony',
-    'vector tattoo flash design',
-    'balanced anatomical alignment',
+    'nominal 65% primary visual focus',
+    '35% secondary geometric layer',
+    'target 45-50% clean negative space',
+    '1.5mm to 2mm line spacing',
+    'balanced vertical anatomical alignment',
   ]
     .filter(Boolean)
-    .filter((s) => !containsForbiddenWords(s, excludedClean, motherName));
+    .filter((s) => !containsForbiddenWords(s, excludedClean, motherName))
+    .filter((s) => !isAnimalNameOrSpecies(s, totemName));
 
   const promptSubjects = promptSubjectParts.join(', ');
   const sanitizedStyleKeywords = styleMeta.aestheticPromptKeywords.filter(
@@ -237,33 +385,68 @@ export function generateUnifiedVisualPrompt(
     ? colorMeta.promptModifier
     : '';
 
-  const noParamKeywords = [
-    'shading noise',
-    'color smudge',
-    'ugly anatomy',
-    'cartoonish',
-    'photo frame',
-    'skin pores',
-    'realistic animal face',
-    'realistic animal head',
+  // Aşama 5.4.0 Zorunlu Negatif Filtreler:
+  // Kol/cilt, insan bedeni, fotoğraf, mockup, kağıt dokusu, gölge, çerçeve ve tipografi yasakları
+  const mandatoryMockupAndBodyNegatives = [
+    'photorealistic human arm',
+    'tattooed skin',
+    'human body',
+    'skin texture',
+    'arm mockup',
+    'hand mockup',
+    'body photography',
+    'lifestyle photography',
+    'product photography',
+    'table mockup',
+    'paper texture',
+    'folded paper',
+    'frame',
+    'border',
+    'drop shadow',
+    'environmental background',
+    'colored background',
+    'watermark',
+    'text',
+    'letters',
+    'numbers',
+    'typography',
   ];
 
-  const primaryPromptEn = `${promptSubjects}, ${promptStyleTokens}, ${promptColorTokens}, professional vector tattoo stencil, sharp crisp lines, immaculate geometry, pure white background --no ${noParamKeywords.join(', ')}`;
-
-  const conceptPromptTr = `${clientFullName} için ${styleMeta.nameTr} stilinde, ${placementMeta.nameTr} bölgesine özel (${effectiveDimensions.width}x${effectiveDimensions.height} cm), ${primarySymbolItems[0]} merkezli kişiye özel dövme tasarımı.`;
-
-  // Negatif prompt: Hariç tutulan semboller dahil edilir, ANNE ADI KESİNLİKLE EKLENMEZ
-  const negativePromptList = [
+  const artisticQualityNegatives = [
     'blur',
     'ugly lines',
     'low contrast',
     'color bleeding',
     'cartoonish sticker look',
     'realistic animal face',
-    'text watermark',
+    'realistic animal head',
     'deformed geometry',
-    ...excludedClean,
+    'shading noise',
+    'color smudge',
+    'ugly anatomy',
+    'skin pores',
+    'no names',
+    'no letters',
+    'no words',
+    'no text',
+    'no dates',
+    'no personal text',
+    'no typography',
   ];
+
+  const combinedNegativeList = Array.from(
+    new Set([...mandatoryMockupAndBodyNegatives, ...artisticQualityNegatives])
+  );
+
+  const primaryPromptEn = `${promptSubjects}, ${promptStyleTokens}, ${promptColorTokens}, professional tattoo stencil flash sheet, standalone graphic design, pure white background --no ${combinedNegativeList.join(', ')}`;
+
+  const conceptPromptTr = `${clientFullName} için ${styleMeta.nameTr} stilinde, ${placementMeta.nameTr} bölgesine özel (${effectiveDimensions.width}x${effectiveDimensions.height} cm, min 16x10 cm, ideal 22x14 cm), %65 ana odak ve %45–50 negatif alan hedefiyle ${primarySymbolItems[0]} merkezli kişiye özel dövme tasarımı.`;
+
+  // Negatif prompt: Zorunlu yasaklar + kalite filtreleri + hariç tutulan semboller;
+  // AŞAMA 5.4.0.1: Anne adı VE hayvan adı/türü negatif prompta da ASLA eklenmez (API'ye hiçbir hayvan adı aktarılmaz)
+  const negativePromptList = Array.from(
+    new Set([...combinedNegativeList, ...excludedClean])
+  ).filter((term) => !isAnimalNameOrSpecies(term, totemName));
 
   return {
     primaryPromptEn,

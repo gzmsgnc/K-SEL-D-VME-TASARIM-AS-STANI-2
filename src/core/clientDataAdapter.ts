@@ -14,6 +14,8 @@ import { Client } from '../types/client';
 import { ClientArchiveRecord } from '../types/archive';
 import { ModuleId, ModuleExecutionStatus, validateModuleInputs } from './moduleRegistry';
 import { resolveEffectiveBirthTime, resolveAstrologicalCoordinates, EffectiveBirthTimeContext, AstrologicalCoordinatesContext } from './birthTimeHelper';
+import { isAstrologyChartStale } from '../modules/astrology';
+import { isNumerologyStale } from '../modules/numerology';
 
 export interface ClientModuleContext {
   clientId: string;
@@ -58,21 +60,41 @@ export function hasActualModuleResults(archive: ClientArchiveRecord | null, modu
   switch (moduleId) {
     case 'ASTROLOGY': {
       const activeAnalysis = archive.analyses.find((a) => a.clientId === currentClientId);
-      return Boolean(activeAnalysis?.astrology && activeAnalysis.astrology.planetaryPositions && activeAnalysis.astrology.planetaryPositions.length > 0);
+      const astro = activeAnalysis?.astrology;
+      if (!astro || !astro.planetaryPositions || astro.planetaryPositions.length === 0) {
+        return false;
+      }
+      if (isAstrologyChartStale(astro, archive.client)) {
+        return false;
+      }
+      return true;
     }
     case 'NUMEROLOGY': {
       const activeAnalysis = archive.analyses.find((a) => a.clientId === currentClientId);
-      return Boolean(activeAnalysis?.numerology && typeof activeAnalysis.numerology.lifePathNumber === 'number');
+      const num = activeAnalysis?.numerology;
+      if (!num || typeof num.lifePathNumber !== 'number') {
+        return false;
+      }
+      if (isNumerologyStale(num, archive.client)) {
+        return false;
+      }
+      return true;
     }
     case 'EBCED': {
       const activeAnalysis = archive.analyses.find((a) => a.clientId === currentClientId);
       return Boolean(activeAnalysis?.ebced && typeof activeAnalysis.ebced.combinedTotal === 'number');
     }
     case 'CHAKRA': {
+      if (!hasActualModuleResults(archive, 'NUMEROLOGY')) {
+        return false;
+      }
       const activeAnalysis = archive.analyses.find((a) => a.clientId === currentClientId);
       return Boolean(activeAnalysis?.chakra && activeAnalysis.chakra.chakras && activeAnalysis.chakra.chakras.length > 0);
     }
     case 'ARCHETYPE': {
+      if (!hasActualModuleResults(archive, 'NUMEROLOGY') || !hasActualModuleResults(archive, 'CHAKRA')) {
+        return false;
+      }
       const activeAnalysis = archive.analyses.find((a) => a.clientId === currentClientId);
       return Boolean(activeAnalysis?.archetype && activeAnalysis.archetype.unifiedArchetype?.primary);
     }

@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Client, ClientFormData } from '../types/client';
 import { ClientArchiveRecord } from '../types/archive';
 import { TropicalNatalChart } from '../types/astrology';
-import { NumerologyAnalysis, ChakraAnalysis, ArchetypeAnalysis } from '../types/analysis';
+import { NumerologyAnalysis, ChakraAnalysis, ArchetypeAnalysis, EbcedAnalysis } from '../types/analysis';
 import { ClientTattooDesign } from '../types/design';
 import { ClientSymbolAnalysis } from '../types/symbol';
-import { ClientTestResult, TestType } from '../types/test';
+import { ClientTestResult, TestType, ClientTestDraft } from '../types/test';
+import { ClientTattooReport } from '../types/report';
 import {
   getStoredClients,
   createClientRecord,
@@ -16,6 +17,8 @@ import {
   clearClientAstrologyChart,
   saveClientNumerology as saveClientNumerologyStorage,
   clearClientNumerology as clearClientNumerologyStorage,
+  saveClientEbced as saveClientEbcedStorage,
+  clearClientEbced as clearClientEbcedStorage,
   saveClientChakra as saveClientChakraStorage,
   clearClientChakra as clearClientChakraStorage,
   saveClientArchetype as saveClientArchetypeStorage,
@@ -23,50 +26,79 @@ import {
   saveClientDesign as saveClientDesignStorage,
   deleteClientDesign as deleteClientDesignStorage,
   clearClientDesigns as clearClientDesignsStorage,
+  saveClientReport as saveClientReportStorage,
+  clearClientReports as clearClientReportsStorage,
   saveClientSymbolAnalysis as saveClientSymbolAnalysisStorage,
   deleteClientSymbolAnalysis as deleteClientSymbolAnalysisStorage,
   clearClientSymbolAnalyses as clearClientSymbolAnalysesStorage,
   saveClientTestResult as saveClientTestResultStorage,
   clearClientTestResult as clearClientTestResultStorage,
+  saveClientTestDraft as saveClientTestDraftStorage,
+  getClientTestDraft as getClientTestDraftStorage,
+  clearClientTestDraft as clearClientTestDraftStorage,
   getStoredActiveClientId,
   setStoredActiveClientId,
   clearAllApplicationData as clearAllApplicationDataStorage,
+  StorageWriteStatus,
+  MultiStorageWriteStatus,
+  getLastStorageWriteResult,
 } from './storage';
 import { validateClientFormData } from '../validation/clientValidation';
 import { runClientAutoAnalysisChain, AutoAnalysisChainResult, AutoAnalysisChainOptions } from '../modules/pipeline';
 
+import { AppRoute, WorkspaceDetailTab } from '../types/navigation';
+
 export type AppMode = 'CLIENT_FORM' | 'OWNER_WORKSPACE' | 'SYSTEM_ADMIN';
+
+export interface AppStorageResult {
+  success: boolean;
+  storageStatus?: StorageWriteStatus | MultiStorageWriteStatus;
+  warning?: string;
+  error?: string;
+}
 
 interface AppContextType {
   mode: AppMode;
   setMode: (mode: AppMode) => void;
+  currentRoute: AppRoute;
+  setCurrentRoute: (route: AppRoute) => void;
+  targetDetailTab: WorkspaceDetailTab | null;
+  setTargetDetailTab: (tab: WorkspaceDetailTab | null) => void;
+  navigateToClient: (clientId: string, tab?: WorkspaceDetailTab) => void;
   clients: Client[];
   activeClient: Client | null;
   activeClientId: string | null;
   setActiveClientId: (id: string | null) => void;
   activeClientArchive: ClientArchiveRecord | null;
-  submitClientForm: (data: ClientFormData) => Promise<{ success: boolean; errors?: Record<string, string>; client?: Client }>;
-  createClientManual: (data: ClientFormData) => Promise<{ success: boolean; errors?: Record<string, string>; client?: Client }>;
-  updateClient: (client: Client) => { success: boolean; error?: string };
-  deleteClient: (clientId: string) => void;
+  submitClientForm: (data: ClientFormData) => Promise<{ success: boolean; storageStatus?: StorageWriteStatus | MultiStorageWriteStatus; warning?: string; errors?: Record<string, string>; client?: Client }>;
+  createClientManual: (data: ClientFormData) => Promise<{ success: boolean; storageStatus?: StorageWriteStatus | MultiStorageWriteStatus; warning?: string; errors?: Record<string, string>; client?: Client }>;
+  updateClient: (client: Client) => AppStorageResult;
+  deleteClient: (clientId: string) => AppStorageResult;
   refreshClients: () => void;
-  resetAllSystemData: () => void;
-  saveClientAstrology: (clientId: string, chart: TropicalNatalChart) => { success: boolean; error?: string };
-  clearClientAstrology: (clientId: string) => void;
-  saveClientNumerology: (clientId: string, numerology: NumerologyAnalysis) => { success: boolean; error?: string };
-  clearClientNumerology: (clientId: string) => void;
-  saveClientChakra: (clientId: string, chakra: ChakraAnalysis) => { success: boolean; error?: string };
-  clearClientChakra: (clientId: string) => void;
-  saveClientArchetype: (clientId: string, archetype: ArchetypeAnalysis) => { success: boolean; error?: string };
-  clearClientArchetype: (clientId: string) => void;
-  saveClientDesign: (clientId: string, design: ClientTattooDesign) => { success: boolean; error?: string };
-  deleteClientDesign: (clientId: string, designId: string) => void;
-  clearClientDesigns: (clientId: string) => void;
-  saveClientSymbolAnalysis: (clientId: string, analysis: ClientSymbolAnalysis) => { success: boolean; error?: string };
-  deleteClientSymbolAnalysis: (clientId: string, analysisId: string) => void;
-  clearClientSymbolAnalyses: (clientId: string) => void;
-  saveClientTestResult: (clientId: string, testResult: ClientTestResult) => { success: boolean; error?: string };
-  clearClientTestResult: (clientId: string, testType?: TestType) => void;
+  resetAllSystemData: () => AppStorageResult;
+  saveClientAstrology: (clientId: string, chart: TropicalNatalChart) => AppStorageResult;
+  clearClientAstrology: (clientId: string) => AppStorageResult;
+  saveClientNumerology: (clientId: string, numerology: NumerologyAnalysis) => AppStorageResult;
+  clearClientNumerology: (clientId: string) => AppStorageResult;
+  saveClientEbced: (clientId: string, ebced: EbcedAnalysis) => AppStorageResult;
+  clearClientEbced: (clientId: string) => AppStorageResult;
+  saveClientChakra: (clientId: string, chakra: ChakraAnalysis) => AppStorageResult;
+  clearClientChakra: (clientId: string) => AppStorageResult;
+  saveClientArchetype: (clientId: string, archetype: ArchetypeAnalysis) => AppStorageResult;
+  clearClientArchetype: (clientId: string) => AppStorageResult;
+  saveClientDesign: (clientId: string, design: ClientTattooDesign) => AppStorageResult;
+  deleteClientDesign: (clientId: string, designId: string) => AppStorageResult;
+  clearClientDesigns: (clientId: string) => AppStorageResult;
+  saveClientReport: (clientId: string, report: ClientTattooReport) => AppStorageResult;
+  clearClientReports: (clientId: string) => AppStorageResult;
+  saveClientSymbolAnalysis: (clientId: string, analysis: ClientSymbolAnalysis) => AppStorageResult;
+  deleteClientSymbolAnalysis: (clientId: string, analysisId: string) => AppStorageResult;
+  clearClientSymbolAnalyses: (clientId: string) => AppStorageResult;
+  saveClientTestResult: (clientId: string, testResult: ClientTestResult) => AppStorageResult;
+  clearClientTestResult: (clientId: string, testType?: TestType) => AppStorageResult;
+  saveClientTestDraft: (clientId: string, testType: TestType, answers: Record<string, string>, activeQuestionIndex?: number) => AppStorageResult;
+  getClientTestDraft: (clientId: string, testType: TestType) => ClientTestDraft | null;
+  clearClientTestDraft: (clientId: string, testType?: TestType) => AppStorageResult;
   runAutoAnalysisForClient: (client: Client, options?: AutoAnalysisChainOptions) => AutoAnalysisChainResult;
   lastChainResult: AutoAnalysisChainResult | null;
   clearLastChainResult: () => void;
@@ -75,17 +107,56 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mode, setMode] = useState<AppMode>('OWNER_WORKSPACE');
+  const [currentRoute, setCurrentRouteState] = useState<AppRoute>('DASHBOARD');
+  const [targetDetailTab, setTargetDetailTab] = useState<WorkspaceDetailTab | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [activeClientId, setActiveClientId] = useState<string | null>(() => getStoredActiveClientId());
   const [lastChainResult, setLastChainResult] = useState<AutoAnalysisChainResult | null>(null);
 
   const [archiveVersion, setArchiveVersion] = useState(0);
 
+  // Geriye dönük AppMode senkronizasyonu
+  const mode: AppMode =
+    currentRoute === 'CLIENT_FORM'
+      ? 'CLIENT_FORM'
+      : currentRoute === 'SYSTEM_ADMIN'
+      ? 'SYSTEM_ADMIN'
+      : 'OWNER_WORKSPACE';
+
+  // Rota yönlendirme ve eski ClientModulePicker rotalarını doğrudan CLIENTS altına bağlama
+  const setCurrentRoute = (route: AppRoute) => {
+    if (route === 'ANALYSIS_HUB') {
+      setTargetDetailTab('ANALYSES');
+      setCurrentRouteState('CLIENTS');
+    } else if (route === 'DESIGN_STUDIO') {
+      setTargetDetailTab('RECIPE');
+      setCurrentRouteState('CLIENTS');
+    } else if (route === 'DESIGN_REPORTS') {
+      setTargetDetailTab('RESULTS');
+      setCurrentRouteState('CLIENTS');
+    } else {
+      setCurrentRouteState(route);
+    }
+  };
+
+  const setMode = (newMode: AppMode) => {
+    if (newMode === 'CLIENT_FORM') setCurrentRoute('CLIENT_FORM');
+    else if (newMode === 'SYSTEM_ADMIN') setCurrentRoute('SYSTEM_ADMIN');
+    else setCurrentRoute('CLIENTS');
+  };
+
   const changeActiveClientId = (id: string | null) => {
     setActiveClientId(id);
     setStoredActiveClientId(id);
     setLastChainResult(null);
+  };
+
+  const navigateToClient = (clientId: string, tab?: WorkspaceDetailTab) => {
+    changeActiveClientId(clientId);
+    if (tab) {
+      setTargetDetailTab(tab);
+    }
+    setCurrentRoute('CLIENTS');
   };
 
   const refreshClients = () => {
@@ -127,11 +198,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const chainRes = runClientAutoAnalysisChain(created, { autoGenerateDesign: true });
       setLastChainResult(chainRes);
       refreshClients();
-      return { success: true, client: created };
-    } catch {
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+        client: created,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
       return {
         success: false,
-        errors: { form: 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.' },
+        storageStatus: (lastRes as any)?.status || 'failed',
+        errors: { form: err?.message || 'Kayıt sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.' },
       };
     }
   };
@@ -148,11 +228,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const chainRes = runClientAutoAnalysisChain(created, { autoGenerateDesign: true });
       setLastChainResult(chainRes);
       refreshClients();
-      return { success: true, client: created };
-    } catch {
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+        client: created,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
       return {
         success: false,
-        errors: { form: 'Kayıt oluşturulurken bir hata oluştu.' },
+        storageStatus: (lastRes as any)?.status || 'failed',
+        errors: { form: err?.message || 'Kayıt oluşturulurken bir hata oluştu.' },
       };
     }
   };
@@ -161,135 +250,532 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       updateClientRecord(updatedClient);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Güncelleme başarısız oldu.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Güncelleme başarısız oldu.',
+      };
     }
   };
 
   const deleteClient = (clientId: string) => {
-    deleteClientRecord(clientId);
-    refreshClients();
+    try {
+      const success = deleteClientRecord(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || (success ? 'persisted' : 'failed');
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Danışan silinemedi.',
+      };
+    }
   };
 
-  const resetAllSystemData = () => {
-    clearAllApplicationDataStorage();
-    refreshClients();
+  const resetAllSystemData = (): AppStorageResult => {
+    try {
+      const success = clearAllApplicationDataStorage();
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || (success ? 'persisted' : 'failed');
+      return {
+        success: storageStatus === 'persisted',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Veriler sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientAstrology = (clientId: string, chart: TropicalNatalChart) => {
     try {
       saveClientAstrologyChart(clientId, chart);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Astroloji kaydı kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Astroloji kaydı kaydedilemedi.',
+      };
     }
   };
 
-  const clearClientAstrology = (clientId: string) => {
-    clearClientAstrologyChart(clientId);
-    refreshClients();
+  const clearClientAstrology = (clientId: string): AppStorageResult => {
+    try {
+      clearClientAstrologyChart(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Astroloji kaydı sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientNumerology = (clientId: string, numerology: NumerologyAnalysis) => {
     try {
       saveClientNumerologyStorage(clientId, numerology);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Numeroloji kaydı kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Numeroloji kaydı kaydedilemedi.',
+      };
     }
   };
 
-  const clearClientNumerology = (clientId: string) => {
-    clearClientNumerologyStorage(clientId);
-    refreshClients();
+  const clearClientNumerology = (clientId: string): AppStorageResult => {
+    try {
+      clearClientNumerologyStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Numeroloji kaydı sıfırlanamadı.',
+      };
+    }
+  };
+
+  const saveClientEbced = (clientId: string, ebced: EbcedAnalysis) => {
+    try {
+      saveClientEbcedStorage(clientId, ebced);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Ebced kaydı kaydedilemedi.',
+      };
+    }
+  };
+
+  const clearClientEbced = (clientId: string): AppStorageResult => {
+    try {
+      clearClientEbcedStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Ebced kaydı sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientChakra = (clientId: string, chakra: ChakraAnalysis) => {
     try {
       saveClientChakraStorage(clientId, chakra);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Çakra kaydı kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Çakra kaydı kaydedilemedi.',
+      };
     }
   };
 
-  const clearClientChakra = (clientId: string) => {
-    clearClientChakraStorage(clientId);
-    refreshClients();
+  const clearClientChakra = (clientId: string): AppStorageResult => {
+    try {
+      clearClientChakraStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Çakra kaydı sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientArchetype = (clientId: string, archetype: ArchetypeAnalysis) => {
     try {
       saveClientArchetypeStorage(clientId, archetype);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Arketip kaydı kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Arketip kaydı kaydedilemedi.',
+      };
     }
   };
 
-  const clearClientArchetype = (clientId: string) => {
-    clearClientArchetypeStorage(clientId);
-    refreshClients();
+  const clearClientArchetype = (clientId: string): AppStorageResult => {
+    try {
+      clearClientArchetypeStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Arketip kaydı sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientDesign = (clientId: string, design: ClientTattooDesign) => {
     try {
       saveClientDesignStorage(clientId, design);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Dövme reçetesi kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Dövme reçetesi kaydedilemedi.',
+      };
     }
   };
 
-  const deleteClientDesign = (clientId: string, designId: string) => {
-    deleteClientDesignStorage(clientId, designId);
-    refreshClients();
+  const deleteClientDesign = (clientId: string, designId: string): AppStorageResult => {
+    try {
+      deleteClientDesignStorage(clientId, designId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Tasarım silinemedi.',
+      };
+    }
   };
 
-  const clearClientDesigns = (clientId: string) => {
-    clearClientDesignsStorage(clientId);
-    refreshClients();
+  const clearClientDesigns = (clientId: string): AppStorageResult => {
+    try {
+      clearClientDesignsStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Tasarımlar sıfırlanamadı.',
+      };
+    }
+  };
+
+  const saveClientReport = (clientId: string, report: ClientTattooReport) => {
+    try {
+      saveClientReportStorage(clientId, report);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Tasarım tamamlama raporu kaydedilemedi.',
+      };
+    }
+  };
+
+  const clearClientReports = (clientId: string): AppStorageResult => {
+    try {
+      clearClientReportsStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Raporlar sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientSymbolAnalysis = (clientId: string, analysis: ClientSymbolAnalysis) => {
     try {
       saveClientSymbolAnalysisStorage(clientId, analysis);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Sembol analizi kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Sembol analizi kaydedilemedi.',
+      };
     }
   };
 
-  const deleteClientSymbolAnalysis = (clientId: string, analysisId: string) => {
-    deleteClientSymbolAnalysisStorage(clientId, analysisId);
-    refreshClients();
+  const deleteClientSymbolAnalysis = (clientId: string, analysisId: string): AppStorageResult => {
+    try {
+      deleteClientSymbolAnalysisStorage(clientId, analysisId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Sembol analizi silinemedi.',
+      };
+    }
   };
 
-  const clearClientSymbolAnalyses = (clientId: string) => {
-    clearClientSymbolAnalysesStorage(clientId);
-    refreshClients();
+  const clearClientSymbolAnalyses = (clientId: string): AppStorageResult => {
+    try {
+      clearClientSymbolAnalysesStorage(clientId);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Sembol analizleri sıfırlanamadı.',
+      };
+    }
   };
 
   const saveClientTestResult = (clientId: string, testResult: ClientTestResult) => {
     try {
       saveClientTestResultStorage(clientId, testResult);
       refreshClients();
-      return { success: true };
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Test sonucu kaydedilemedi.' };
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Test sonucu kaydedilemedi.',
+      };
     }
   };
 
-  const clearClientTestResult = (clientId: string, testType?: TestType) => {
-    clearClientTestResultStorage(clientId, testType);
-    refreshClients();
+  const clearClientTestResult = (clientId: string, testType?: TestType): AppStorageResult => {
+    try {
+      clearClientTestResultStorage(clientId, testType);
+      refreshClients();
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Test sonucu sıfırlanamadı.',
+      };
+    }
+  };
+
+  const saveClientTestDraft = (
+    clientId: string,
+    testType: TestType,
+    answers: Record<string, string>,
+    activeQuestionIndex?: number
+  ) => {
+    try {
+      saveClientTestDraftStorage(clientId, testType, answers, activeQuestionIndex);
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Test taslağı kaydedilemedi.',
+      };
+    }
+  };
+
+  const getClientTestDraft = (clientId: string, testType: TestType): ClientTestDraft | null => {
+    return getClientTestDraftStorage(clientId, testType);
+  };
+
+  const clearClientTestDraft = (clientId: string, testType?: TestType): AppStorageResult => {
+    try {
+      clearClientTestDraftStorage(clientId, testType);
+      const lastRes = getLastStorageWriteResult();
+      const storageStatus = (lastRes as any)?.status || 'persisted';
+      return {
+        success: storageStatus !== 'failed',
+        storageStatus,
+        warning: (lastRes as any)?.warning,
+      };
+    } catch (err: any) {
+      const lastRes = getLastStorageWriteResult();
+      return {
+        success: false,
+        storageStatus: (lastRes as any)?.status || 'failed',
+        error: err?.message || 'Test taslağı silinemedi.',
+      };
+    }
   };
 
   const runAutoAnalysisForClient = (
@@ -311,6 +797,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         mode,
         setMode,
+        currentRoute,
+        setCurrentRoute,
+        targetDetailTab,
+        setTargetDetailTab,
+        navigateToClient,
         clients,
         activeClient,
         activeClientId,
@@ -326,6 +817,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearClientAstrology,
         saveClientNumerology,
         clearClientNumerology,
+        saveClientEbced,
+        clearClientEbced,
         saveClientChakra,
         clearClientChakra,
         saveClientArchetype,
@@ -333,11 +826,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveClientDesign,
         deleteClientDesign,
         clearClientDesigns,
+        saveClientReport,
+        clearClientReports,
         saveClientSymbolAnalysis,
         deleteClientSymbolAnalysis,
         clearClientSymbolAnalyses,
         saveClientTestResult,
         clearClientTestResult,
+        saveClientTestDraft,
+        getClientTestDraft,
+        clearClientTestDraft,
         runAutoAnalysisForClient,
         lastChainResult,
         clearLastChainResult,

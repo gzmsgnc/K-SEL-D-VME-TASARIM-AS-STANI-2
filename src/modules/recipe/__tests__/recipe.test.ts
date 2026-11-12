@@ -335,8 +335,12 @@ describe('A15: Dövme Reçetesi Motoru Doğrulama ve Entegrasyon Testleri', () =
       const hasMotherInSymbols = (design.recipe.secondarySymbols || []).some((s) => s.includes(motherName));
       assert.strictEqual(hasMotherInSymbols, false, 'Anne adı hiçbir sembol alanına sızmamalıdır.');
 
-      // Negative prompt anne adını koruyucu olarak içerebilir
-      assert.ok(design.aiPrompt.negativePrompt.includes(motherName));
+      // Anne adı hiçbir prompta (pozitif veya negatif) aktarılmaz; genel yazı ve isim yasağı kuralı yer alır
+      assert.strictEqual(design.aiPrompt.primaryPromptEn.includes(motherName), false);
+      assert.strictEqual(design.aiPrompt.conceptPromptTr.includes(motherName), false);
+      assert.strictEqual(design.aiPrompt.negativePrompt.includes(motherName), false);
+      assert.ok(design.aiPrompt.negativePrompt.includes('no names'));
+      assert.ok(design.aiPrompt.negativePrompt.includes('no personal text'));
     });
   });
 
@@ -514,14 +518,13 @@ describe('A15: Dövme Reçetesi Motoru Doğrulama ve Entegrasyon Testleri', () =
 
       const resV2 = generateClientRecipe(client, archive, { preferredStyle: 'SACRED_GEOMETRY' });
       assert.ok(resV2.success && resV2.design);
-      assert.strictEqual(resV2.design.versionNumber, 2);
+      assert.strictEqual(resV2.design.versionNumber, 1);
       saveClientDesign(client.id, resV2.design);
 
-      // İki versiyon da arşivde korunmalıdır (Kural 14)
+      // Tekil güncel kayıt ilkesi: Yeni reçete kaydedildiğinde önceki silinir, arşivde yalnızca 1 güncel kayıt kalır
       archive = getClientArchive(client.id);
-      assert.strictEqual(archive?.designs.length, 2);
-      assert.strictEqual(archive?.designs[0].versionNumber, 1);
-      assert.strictEqual(archive?.designs[1].versionNumber, 2);
+      assert.strictEqual(archive?.designs.length, 1, 'Tekil güncel kayıt ilkesi: arşivde yalnızca 1 tasarım kalmalıdır');
+      assert.strictEqual(archive?.designs[0].recipe.style, 'SACRED_GEOMETRY');
 
       // Kural 15: Reçeteleri sıfırlama yalnızca tasarımları silmeli, analizleri KESİNLİKLE silmemelidir
       clearClientDesigns(client.id);

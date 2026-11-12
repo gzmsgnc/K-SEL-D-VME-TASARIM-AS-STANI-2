@@ -4,6 +4,8 @@ import { TropicalNatalChart } from './astrology';
  * Numeroloji Analiz Veri Modeli
  */
 export interface NumerologyAnalysis {
+  fullName?: string;              // Hesaplamanın yapıldığı tam ad (Girdi referansı)
+  birthDate?: string;             // Hesaplamanın yapıldığı doğum tarihi (YYYY-MM-DD)
   lifePathNumber: number;         // Yaşam Yolu Sayısı (Doğum tarihinden)
   destinyNumber: number;          // Kader / İfade Sayısı (Tam addan)
   soulUrgeNumber: number;         // Ruh Güdüsü / Kalp Arzusu Sayısı (Sesli harflerden)

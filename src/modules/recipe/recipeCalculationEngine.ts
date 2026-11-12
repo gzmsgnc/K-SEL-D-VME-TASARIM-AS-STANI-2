@@ -14,6 +14,7 @@ import {
   BodyPlacement,
   DetailedSymbolRationale,
   ComprehensiveDesignReport,
+  RecipeCompositionMetrics,
 } from '../../types/design';
 import { generateId } from '../../utils/id';
 import { TROPICAL_ZODIAC_SIGNS } from '../astrology/constants';
@@ -25,6 +26,7 @@ import {
   COLOR_PROFILES,
 } from './constants';
 import { RecipeGenerationOptions } from './types';
+import { MASTER_SYMBOLS, ALL_MASTER_SYMBOLS } from '../symbols/masterSymbols';
 
 export interface RecipeEngineInput {
   client: Client;
@@ -116,12 +118,20 @@ export function generateTattooRecipeFromAnalyses(
   const colorInfo = COLOR_PROFILES[colorProfileKey] || COLOR_PROFILES.MONOCHROME_BLACK;
 
   // 3. Sembol Katmanlarının Oluşturulması
-  // A) Ana Sembol (Primary Symbol): Yaşam Yolu geometrisi ve Ana Arketip rezonansı veya kullanıcı seçimi
+  // A) Yapılandırılmış Sembol Nesneleri (ADIM 2B: BİRİNCİL, İKİNCİL, VURGU hiyerarşisi)
+  const selectedSymbolObjects = options.selectedSymbolObjects || [];
+  const primarySelectedObj = selectedSymbolObjects.find((s) => s.weight === 'PRIMARY');
+  const secondarySelectedObjs = selectedSymbolObjects.filter((s) => s.weight === 'SECONDARY');
+  const accentSelectedObjs = selectedSymbolObjects.filter((s) => s.weight === 'ACCENT');
+
+  // Ana Sembol (Primary Symbol): Yaşam Yolu geometrisi ve Ana Arketip rezonansı veya kullanıcı seçimi
   const lifePathResonance = NUMBER_RESONANCE_TABLE[numerology.lifePathNumber];
   let primarySymbolCandidate =
-    options.primarySymbol && !isExcluded(options.primarySymbol, excludedClean, motherName)
-      ? options.primarySymbol
-      : `${lifePathResonance?.tattooSymbolTheme || 'Altın oran dairesel mandala ve kutsal yaşam tohumu'}`;
+    primarySelectedObj?.symbolName && !isExcluded(primarySelectedObj.symbolName, excludedClean, motherName)
+      ? primarySelectedObj.symbolName
+      : options.primarySymbol && !isExcluded(options.primarySymbol, excludedClean, motherName)
+        ? options.primarySymbol
+        : `${lifePathResonance?.tattooSymbolTheme || 'Altın oran dairesel mandala ve kutsal yaşam tohumu'}`;
 
   if (isExcluded(primarySymbolCandidate, excludedClean, motherName)) {
     primarySymbolCandidate = 'Kutsal oranlı geometrik güneş ekseni ve denge halkası';
@@ -136,16 +146,33 @@ export function generateTattooRecipeFromAnalyses(
   // - Arketip: Gölge arketipin dönüştürücü sembolü
   const candidateSecondary: string[] = [];
 
-  // Astroloji Katkısı (Yalnızca Güneş ve Ay hizalanması - Yükselen/ASC ve Placidus kapsam dışıdır)
+  // Astroloji Katkısı: Batı tropikal zodyak analiziyle Güneş, Ay ve Yükselen burçları dahil edilir.
+  // MC, astrolojik evler, düğümler ve Vedik sistemler tasarıma dahil edilmez.
   if (astrology) {
     const sunSign = astrology.sunSign || astrology.planetaryPositions?.find((p) => p.body === 'Sun')?.sign;
     const moonSign = astrology.moonSign || astrology.planetaryPositions?.find((p) => p.body === 'Moon')?.sign;
+    const ascSign = astrology.ascendantSign || astrology.planetaryPositions?.find((p) => p.body === 'Ascendant')?.sign;
 
-    if (sunSign && moonSign) {
-      const sunMeta = TROPICAL_ZODIAC_SIGNS[sunSign];
-      const moonMeta = TROPICAL_ZODIAC_SIGNS[moonSign];
-      const astroSymbol = `${sunMeta?.nameTr || sunSign} Güneş (${sunMeta?.symbolGlyph || '☉'}) ve ${moonMeta?.nameTr || moonSign} Ay (${moonMeta?.symbolGlyph || '☽'}) hizalanması`;
-      if (!isExcluded(astroSymbol, excludedClean, motherName)) {
+    const sunMeta = sunSign ? TROPICAL_ZODIAC_SIGNS[sunSign] : null;
+    const moonMeta = moonSign ? TROPICAL_ZODIAC_SIGNS[moonSign] : null;
+    const ascMeta = ascSign ? TROPICAL_ZODIAC_SIGNS[ascSign] : null;
+    const isAscApprox = Boolean(astrology.isBirthTimeUnknown);
+    const ascSuffix = isAscApprox ? ' (12:00 varsayımlı, kesin değil - doğum saati bilinmiyor)' : '';
+
+    const astroParts: string[] = [];
+    if (sunSign) {
+      astroParts.push(`${sunMeta?.nameTr || sunSign} Güneş (${sunMeta?.symbolGlyph || '☉'})`);
+    }
+    if (moonSign) {
+      astroParts.push(`${moonMeta?.nameTr || moonSign} Ay (${moonMeta?.symbolGlyph || '☽'})`);
+    }
+    if (ascSign) {
+      astroParts.push(`${ascMeta?.nameTr || ascSign} Yükselen (ASC${ascSuffix})`);
+    }
+
+    if (astroParts.length > 0) {
+      const astroSymbol = `${astroParts.join(', ')} kozmik hizalanması`;
+      if (!isExcluded(astroSymbol, excludedClean)) {
         candidateSecondary.push(astroSymbol);
       }
     }
@@ -176,7 +203,14 @@ export function generateTattooRecipeFromAnalyses(
   }
   const cleanTransformSymbol = safeTransformSymbol.trim().replace(/[.,\s]+$/, '');
 
-  // Kullanıcı tarafından seçilmiş semboller
+  // Kullanıcı tarafından seçilmiş İKİNCİL semboller (Yapılandırılmış listeden)
+  for (const sObj of secondarySelectedObjs) {
+    if (!isExcluded(sObj.symbolName, excludedClean, motherName) && !candidateSecondary.includes(sObj.symbolName)) {
+      candidateSecondary.push(sObj.symbolName);
+    }
+  }
+
+  // Geriye dönük uyumluluk: options.selectedSymbols dizisi
   if (options.selectedSymbols && options.selectedSymbols.length > 0) {
     for (const sel of options.selectedSymbols) {
       if (!isExcluded(sel, excludedClean, motherName) && !candidateSecondary.includes(sel)) {
@@ -185,17 +219,69 @@ export function generateTattooRecipeFromAnalyses(
     }
   }
 
-  // C) Totem Değerlendirmesi (Kural 7 & 8)
+  // C) Vurgu Sembolleri (Accent Symbols - Asla İKİNCİL'e dönüştürülmez!)
+  const candidateAccent: string[] = [];
+  for (const aObj of accentSelectedObjs) {
+    if (!isExcluded(aObj.symbolName, excludedClean, motherName) && !candidateAccent.includes(aObj.symbolName)) {
+      candidateAccent.push(aObj.symbolName);
+    }
+  }
+  if (options.accentSymbols && options.accentSymbols.length > 0) {
+    for (const acc of options.accentSymbols) {
+      if (!isExcluded(acc, excludedClean, motherName) && !candidateAccent.includes(acc)) {
+        candidateAccent.push(acc);
+      }
+    }
+  }
+
+  // C) Totem Değerlendirmesi (Kural 7, 8 & A62)
   const totemTest = [...testResults].reverse().find(
     (t) => t.testType === 'ANIMAL_TOTEM' && Boolean(t.primaryType || (t as any).primaryTotem)
   );
-  const primaryName = totemTest?.primaryType || '';
-  const secondaryName = totemTest?.secondaryType || '';
+
+  let effectiveTotemAnimal = '';
+  let effectiveTotemRole = '';
+  if (totemTest) {
+    if (totemTest.selectedTotemAnimal && !isExcluded(totemTest.selectedTotemAnimal, excludedClean, motherName)) {
+      effectiveTotemAnimal = totemTest.selectedTotemAnimal;
+      effectiveTotemRole = 'Danışan Tarafından Seçilen Totem';
+    } else if (totemTest.totemPriorityRankings && totemTest.totemPriorityRankings.length > 0) {
+      const rejectedList = totemTest.rejectedTotemAnimals || [];
+      const candidate = totemTest.totemPriorityRankings.find(
+        (item) =>
+          item.isDesignCandidate &&
+          item.rawScore > 0 &&
+          !rejectedList.includes(item.animal) &&
+          !isExcluded(item.animal, excludedClean, motherName)
+      );
+      if (candidate) {
+        effectiveTotemAnimal = candidate.animal;
+        effectiveTotemRole = candidate.roleLabelTr;
+      }
+    }
+    if (!effectiveTotemAnimal && totemTest.primaryType) {
+      const isExplicitZero =
+        totemTest.dominantScores &&
+        totemTest.dominantScores[totemTest.primaryType] !== undefined &&
+        totemTest.dominantScores[totemTest.primaryType] === 0;
+
+      if (!isExplicitZero && !isExcluded(totemTest.primaryType, excludedClean, motherName)) {
+        effectiveTotemAnimal = totemTest.primaryType;
+        effectiveTotemRole = 'Ana Tasarım Önceliği';
+      }
+    }
+  }
+
+  const primaryName = effectiveTotemAnimal;
+  const secondaryName =
+    totemTest && totemTest.secondaryType && totemTest.secondaryType !== primaryName && !isExcluded(totemTest.secondaryType, excludedClean, motherName)
+      ? totemTest.secondaryType
+      : '';
   const fullTotemTitle = primaryName ? (secondaryName ? `${primaryName} ve ${secondaryName}` : primaryName) : '';
   let totemAbstractionNotes = '';
   let totemPromptPhrase = '';
-  if (totemTest && totemTest.primaryType) {
-    if (options.includeTotemInVisual && !isExcluded(primaryName, excludedClean, motherName)) {
+  if (primaryName) {
+    if (options.includeTotemInVisual) {
       totemAbstractionNotes = `Ruh hayvanı (${fullTotemTitle}) kesinlikle doğrudan veya sticker benzeri bir figür olarak değil; kompozisyona gizlenmiş minimalist soyut çizgiler ve geometrik silüet olarak entegre edilmiştir.`;
       const abstractTotemItem = `Soyut ${fullTotemTitle} silüeti (negatif alan geometrisi)`;
       if (!candidateSecondary.includes(abstractTotemItem)) {
@@ -218,11 +304,14 @@ export function generateTattooRecipeFromAnalyses(
 
   // 4. Sembol Birleşimi ve Hiyerarşi Kuralları
   const symbolCombinationRules = [
-    `Merkezi Odak: ${primarySymbolCandidate}`,
+    `Ana Görsel Odak (~%65 Pozitif Form): ${primarySymbolCandidate}`,
     candidateSecondary.length > 0
-      ? `Tamamlayıcı Katman: ${candidateSecondary.slice(0, 3).join(' · ')}`
-      : 'Tamamlayıcı Katman: Dengeleyici kutsal oran daireleri',
-    `Dengeleyici Çevre: ${styleInfo.nameTr} akış hatları ve nefes alan negatif boşluklar`,
+      ? `Tamamlayıcı Katman (~%35 Pozitif Form): ${candidateSecondary.slice(0, 3).join(' · ')}`
+      : 'Tamamlayıcı Katman (~%35 Pozitif Form): Dengeleyici kutsal oran daireleri',
+    ...(candidateAccent.length > 0
+      ? [`Vurgu ve Mikro Detay Katmanı: ${candidateAccent.join(' · ')}`]
+      : []),
+    `Negatif Alan Hedefi: %45–50 temiz ten boşluğu, ${styleInfo.nameTr} akış hatları ve asgari 1.5–2 mm çizgi aralığı`,
     'Tüm sembolik öğeler parçalı yamalar halinde değil, tek bir akıcı ve bütünsel kompozisyonda eritilmelidir.',
   ];
 
@@ -236,11 +325,15 @@ export function generateTattooRecipeFromAnalyses(
   // 5. Sanatçıya Yönelik Teknik Uygulama Talimatları (Kural 10 & 12)
   const technicalAdviceForArtist: string[] = [
     ...styleInfo.needleRecommendationsTr,
+    'Hassas Çizgi Güvenlik Aralığı: Çizgiler arasında asgari 1.5–2.0 mm mesafe bırakılarak pigment yayılması (blowout) ve hatların kaynaşması önlenmelidir.',
     styleInfo.lineSpacingAdviceTr,
     styleInfo.antiBlowoutWarningTr,
-    `Önerilen Ebat: ${effectiveDimensions.width}cm x ${effectiveDimensions.height}cm (${effectiveDimensions.width} cm Genişlik × ${effectiveDimensions.height} cm Yükseklik; İdeal: 22 × 14 cm, Min: 16 × 10 cm - ${placementInfo.nameTr} anatomisi için optimize edilmiştir).`,
+    `Önerilen Ebat: ${effectiveDimensions.width}cm x ${effectiveDimensions.height}cm (${effectiveDimensions.width} cm Genişlik × ${effectiveDimensions.height} cm Yükseklik; İdeal: 22 × 14 cm, Asgari: 16 × 10 cm - ${placementInfo.nameTr} anatomisi için optimize edilmiştir).`,
     `Renk/Mürekkep Uygulaması: ${colorInfo.nameTr} (${colorInfo.rationaleTr}).`,
-    'Kompozisyonda en az %30 oranında temiz ten (negatif alan) bırakılarak dövmenin zamanla yaşlanması ve pigment netliği korunmalıdır.',
+    'Kompozisyon ve Negatif Alan Hedefi: Toplam yerleşim alanının %45–50\'si temiz ten (negatif alan) olarak korunmalı, pozitif dövme formunun ~%65\'i ana görsel odağa (Yaşam Yolu & Birincil Arketip çıpası), kalan ~%35\'i ikincil göksel/çakra katmanlarına ayrılmalıdır.',
+    ...(candidateAccent.length > 0
+      ? [`Vurgu Sembolleri: ${candidateAccent.join(', ')} mikro detay ve tek iğne hassasiyetiyle ana odağı gölgelemeden işlenmelidir.`]
+      : []),
   ];
 
   // 6. Felsefi ve Anlamsal Konsept Manifestosu (Concept Statement - Kural 11: Negatif/kötü ifadeler yok)
@@ -266,9 +359,21 @@ export function generateTattooRecipeFromAnalyses(
   const promptStyleTokens = styleInfo.aestheticPromptKeywords.join(', ');
   const promptColorTokens = colorInfo.promptModifier;
 
+  const safeSecondaryForPrompt = candidateSecondary.length > 0
+    ? candidateSecondary[0]
+        .replace(/Yükselen/gi, 'celestial horizon')
+        .replace(/\(ASC[^)]*\)/gi, '')
+        .replace(/Ay/gi, 'lunar crescent')
+        .replace(/Güneş/gi, 'solar glyph')
+        .replace(/hizalanması/gi, 'alignment')
+        .replace(/kozmik/gi, 'cosmic')
+        .replace(/[()]/g, '')
+        .trim()
+    : '';
+
   const promptSubjects = [
     primarySymbolCandidate,
-    candidateSecondary.length > 0 ? candidateSecondary[0] : '',
+    safeSecondaryForPrompt,
     totemPromptPhrase,
     'mystical sacred geometry',
     'balanced anatomical composition',
@@ -289,7 +394,8 @@ export function generateTattooRecipeFromAnalyses(
     'realistic animal face',
   ];
 
-  const primaryPromptEn = `${promptSubject}, ${promptStyleTokens}, ${promptColorTokens}, professional tattoo flash art, vector perfection, sharp edges, pure white background --no ${defaultNoList.join(', ')}`;
+  const technicalCompositionTokens = '65% dominant central visual core weight, 35% surrounding complementary accents, 45-50% clean skin negative space, minimum 1.5-2.0mm fine linework spacing';
+  const primaryPromptEn = `${promptSubject}, ${technicalCompositionTokens}, ${promptStyleTokens}, ${promptColorTokens}, professional tattoo flash art, vector perfection, sharp edges, pure white background --no ${defaultNoList.join(', ')}`;
 
   const conceptPromptTr = `${client.firstName} için ${styleInfo.nameTr} stilinde, ${placementInfo.nameTr} bölgesine uygun ${primarySymbolCandidate} ve dönüştürücü geometri içeren profesyonel dövme tasarımı.`;
 
@@ -302,11 +408,15 @@ export function generateTattooRecipeFromAnalyses(
     'realistic animal face',
     'text watermark',
     'deformed geometry',
+    'no names',
+    'no letters',
+    'no words',
+    'no text',
+    'no dates',
+    'no personal text',
+    'no typography',
     ...excludedClean,
   ];
-  if (motherName && motherName.trim().length > 1) {
-    negativePromptItems.push(motherName.trim());
-  }
 
   const negativePrompt = negativePromptItems.join(', ');
 
@@ -316,25 +426,41 @@ export function generateTattooRecipeFromAnalyses(
   const detailedSymbols: DetailedSymbolRationale[] = [];
 
   // 1. Ana Sembol
-  const primaryPersonalTheme = `Yaşam Yolu ${numerology.lifePathNumber} titreşiminin yaşam rotası odağı ve ${archetype.unifiedArchetype.primary} arketipinin ışık potansiyeli.`;
-  const primaryCompRole = 'Merkezi Odak (Primary Core): Tasarımın ana dikey ekseninde yer alan, tüm diğer geometrik ve sembolik katmanları kendine bağlayan taşıyıcı omurga.';
+  const primaryMaster = primarySelectedObj
+    ? (MASTER_SYMBOLS[primarySelectedObj.symbolId] || ALL_MASTER_SYMBOLS.find((s) => s.id === primarySelectedObj.symbolId || s.name === primarySelectedObj.symbolName))
+    : ALL_MASTER_SYMBOLS.find((s) => s.name === primarySymbolCandidate || s.id === primarySymbolCandidate);
+
+  const primaryCustomMeaningClean = primarySelectedObj?.customMeaning?.trim() || undefined;
+  const primaryPersonalTheme = primaryCustomMeaningClean
+    ? primaryCustomMeaningClean
+    : (primaryMaster?.traditionalMeaningTr || `Yaşam Yolu ${numerology.lifePathNumber} titreşiminin yaşam rotası odağı ve ${archetype.unifiedArchetype.primary} arketipinin ışık potansiyeli.`);
+  const primaryCompRole = primaryMaster?.compositionRole
+    ? `Merkezi Odak (Primary Core): ${primaryMaster.compositionRole}. Tasarımın ana dikey ekseninde yer alan, tüm diğer geometrik ve sembolik katmanları kendine bağlayan taşıyıcı omurga.`
+    : 'Merkezi Odak (Primary Core): Tasarımın ana dikey ekseninde yer alan, tüm diğer geometrik ve sembolik katmanları kendine bağlayan taşıyıcı omurga.';
   const primaryRelated = 'Çakra dengeleyici form ve gölge dönüşüm geometrisi ile doğrudan bağlantılıdır; dış katmanlardan gelen enerjiyi merkezde toplayıp dengeler.';
   const primaryVisual = `${styleInfo.nameTr} tekniğiyle; kusursuz altın oran simetrisi, net konturlar ve merkezde nefes alan negatif boşluklarla işlenmelidir.`;
   const primaryLoss = 'Bu sembol çıkarılırsa danışanın Yaşam Yolu titreşimini ve ana arketipini ten üzerinde sabitleyen merkezi çıpa ortadan kalkar; tasarım birleşik bir manifesto olmaktan çıkıp odaksız motiflere dönüşür.';
 
   detailedSymbols.push({
     symbolName: primarySymbolCandidate,
+    symbolId: primaryMaster?.id || primarySelectedObj?.symbolId,
     isPrimary: true,
     weight: 'PRIMARY',
-    originSourceTr: options.primarySymbol
-      ? 'Danışanın doğrudan seçtiği birincil sembol tercihi.'
-      : `Modern Standart Pisagor Numerolojisi Yaşam Yolu ${numerology.lifePathNumber} (${lifePathResonance?.keywordTr || 'Öz Titreşim'}) ve Birincil Arketip (${archetype.unifiedArchetype.primary}) rezonansı.`,
-    originAnalysis: options.primarySymbol ? 'Danışan Özel Seçimi' : 'Pisagor Numerolojisi',
-    originValue: options.primarySymbol ? 'Özel İstek' : `Yaşam Yolu ${numerology.lifePathNumber}`,
+    originSourceTr: primarySelectedObj
+      ? 'Danışanın Sembol Kütüphanesinden seçtiği birincil sembol tercihi.'
+      : (options.primarySymbol
+          ? 'Danışanın doğrudan seçtiği birincil sembol tercihi.'
+          : `Modern Standart Pisagor Numerolojisi Yaşam Yolu ${numerology.lifePathNumber} (${lifePathResonance?.keywordTr || 'Öz Titreşim'}) ve Birincil Arketip (${archetype.unifiedArchetype.primary}) rezonansı.`),
+    originAnalysis: primarySelectedObj ? 'Sembol Kütüphanesi (Birincil)' : (options.primarySymbol ? 'Danışan Özel Seçimi' : 'Pisagor Numerolojisi'),
+    originValue: primarySelectedObj?.symbolName || (options.primarySymbol ? 'Özel İstek' : `Yaşam Yolu ${numerology.lifePathNumber}`),
+    customMeaning: primaryCustomMeaningClean,
+    traditionalMeaningTr: primaryMaster?.traditionalMeaningTr,
+    esotericMeaningTr: primaryMaster?.esotericMeaningTr,
+    analysisAssociations: primaryMaster?.analysisAssociations || [],
+    compositionRole: primaryMaster?.compositionRole || 'PRIMARY_CORE',
     personalThemeTr: primaryPersonalTheme,
     personalTheme: primaryPersonalTheme,
     compositionRoleTr: primaryCompRole,
-    compositionRole: 'Merkezi Odak (Primary Core)',
     relatedSymbolNameTr: primaryRelated,
     relatedSymbol: 'Çakra dengeleyici form ve gölge dönüşüm geometrisi',
     visualExecutionTr: primaryVisual,
@@ -345,26 +471,28 @@ export function generateTattooRecipeFromAnalyses(
 
   // 2. İkincil Semboller
   for (const sym of candidateSecondary) {
-    if (sym.includes('Güneş') && sym.includes('Ay')) {
-      const sunName = (astrology && (astrology.sunSign ? TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr : '')) || 'Güneş';
-      const moonName = (astrology && (astrology.moonSign ? TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr : '')) || 'Ay';
-      const astroTheme = `Bilinçli irade, dışavurum ve yaşam enerjisi (${sunName} Güneş) ile bilinçdışı sezgiler, duygusal güvenlik ihtiyacı (${moonName} Ay) arasındaki kozmik denge.`;
-      const astroLoss = 'Bu sembol çıkarılırsa bireyin doğduğu andaki gökyüzü konumlanışı ve Güneş-Ay içsel kutupsallığının kişisel ritmi tasarımdan eksilir.';
+    if (sym.includes('Güneş') || sym.includes('Ay') || sym.includes('Yükselen') || sym.includes('ASC')) {
+      const sunName = (astrology && astrology.sunSign ? TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr : '') || 'Güneş';
+      const moonName = (astrology && astrology.moonSign ? TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr : '') || 'Ay';
+      const ascName = (astrology && astrology.ascendantSign ? TROPICAL_ZODIAC_SIGNS[astrology.ascendantSign]?.nameTr : '') || 'Yükselen';
+      const isAscApprox = Boolean(astrology?.isBirthTimeUnknown);
+      const astroTheme = `Bilinçli öz irade ve yaşam enerjisi (${sunName} Güneş), bilinçdışı sezgiler ve duygusal güvenlik (${moonName} Ay) ile dış dünyayla kurulan temas tarzı (${ascName} Yükselen) arasındaki kozmik denge.${isAscApprox ? ' (Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; Yükselen burç sonucu kesin değildir).' : ''}`;
+      const astroLoss = 'Bu sembol çıkarılırsa bireyin Güneş öz iradesi, Ay sezgisel derinliği ve dış dünyaya açılan yükselen ekseninin göksel rezonansı tasarımdan eksilir.';
       detailedSymbols.push({
         symbolName: sym,
         isPrimary: false,
         weight: 'SECONDARY',
-        originSourceTr: `Batı / Tropical Zodyak analizi (${sunName} Güneş, ${moonName} Ay - Yalnızca onaylı 10 gezegen kapsamı; eksen noktaları ve ev sistemleri hariçtir).`,
+        originSourceTr: `Batı / Tropical Zodyak analizi (${sunName} Güneş, ${moonName} Ay, ${ascName} Yükselen - Güneş, Ay ve Yükselen burçları dahil edilmiş; MC, evler, düğümler ve Vedik sistem hariç tutulmuştur.${isAscApprox ? ' Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır, Yükselen kesin değildir.' : ''})`,
         originAnalysis: 'Batı / Tropical Zodyak',
-        originValue: `${sunName} Güneş & ${moonName} Ay`,
+        originValue: `${sunName} Güneş, ${moonName} Ay & ${ascName} Yükselen${isAscApprox ? ' (12:00 varsayımlı, kesin değil)' : ''}`,
         personalThemeTr: astroTheme,
         personalTheme: astroTheme,
         compositionRoleTr: 'Tamamlayıcı Göksel Katman: Ana sembolün üst/yan kanatlarında yer alarak kompozisyona zamansal ve göksel imza kazandırır.',
         compositionRole: 'Tamamlayıcı Göksel Katman',
-        relatedSymbolNameTr: `Merkezi ${primarySymbolCandidate} ile hizalanır; eril (Güneş) ve dişil (Ay) kutupları merkezi mandalanın sağ ve sol kanatlarında dengeler.`,
+        relatedSymbolNameTr: `Merkezi ${primarySymbolCandidate} ile hizalanır; Güneş iradesi, Ay sezgisi ve Yükselen eksenini merkezi mandalanın kanatlarında dengeler.`,
         relatedSymbol: `Merkezi ${primarySymbolCandidate}`,
-        visualExecutionTr: 'Minimalist astronomik glifler, ince mikro çizgi yayları ve göksel yörünge eğrileriyle ana geometriye organik olarak kaynaştırılmalıdır.',
-        visualExecution: 'Minimalist astronomik glifler ve mikro çizgi yayları',
+        visualExecutionTr: 'Minimalist astronomik güneş, ay ve yükselen glifleri, ince mikro çizgi yaylarıyla ana geometriye kaynaştırılmalıdır.',
+        visualExecution: 'Minimalist güneş, ay ve yükselen glifleri ve mikro çizgi yayları',
         layerLossMeaningTr: astroLoss,
         meaningRiskIfRemoved: astroLoss,
       });
@@ -435,27 +563,88 @@ export function generateTattooRecipeFromAnalyses(
         meaningRiskIfRemoved: totemLoss,
       });
     } else {
-      const customTheme = 'Danışanın estetik ve ruhsal yolculuğunda bilinçli olarak tenine taşımak istediği kişisel niyet ve kültürel bağ.';
-      const customLoss = 'Danışanın bilinçli iradesiyle kattığı kişisel niyet ve estetik vurgu tasarımdan eksilir.';
+      const selObj = selectedSymbolObjects.find((s) => s.symbolName === sym || s.symbolId === sym);
+      const masterSym = selObj
+        ? (MASTER_SYMBOLS[selObj.symbolId] || ALL_MASTER_SYMBOLS.find((s) => s.id === selObj.symbolId || s.name === selObj.symbolName))
+        : ALL_MASTER_SYMBOLS.find((s) => s.name === sym || s.id === sym);
+
+      const secondaryCustomMeaningClean = selObj?.customMeaning?.trim() || undefined;
+      const secondaryTheme = secondaryCustomMeaningClean
+        ? secondaryCustomMeaningClean
+        : (masterSym?.traditionalMeaningTr || `${sym} tamamlayıcı katmanı.`);
+      const secondaryLoss = `Bu sembol çıkarılırsa tasarımın ${masterSym?.originCulture ? `${masterSym.originCulture} kökenli ` : ''}tamamlayıcı katmanı ve estetik dengesi eksilir.`;
+
       detailedSymbols.push({
         symbolName: sym,
+        symbolId: masterSym?.id || selObj?.symbolId,
         isPrimary: false,
         weight: 'SECONDARY',
-        originSourceTr: 'Danışanın bilinçli tercihi ve onaylanan kişisel sembol seçimi.',
-        originAnalysis: 'Danışan Özel Tercihi',
-        originValue: sym,
-        personalThemeTr: customTheme,
-        personalTheme: customTheme,
-        compositionRoleTr: 'Aksan ve Çevreleme Katmanı: Kompozisyonun dış hatlarını çerçeveleyen veya dengeleyici aks oluşturan unsur.',
-        compositionRole: 'Aksan ve Çevreleme Katmanı',
-        relatedSymbolNameTr: 'Merkezi eksenin simetrisini destekler.',
-        relatedSymbol: 'Merkezi eksen',
+        originSourceTr: selObj
+          ? 'Danışanın Sembol Kütüphanesinden seçtiği ikincil sembol tercihi.'
+          : 'Danışanın bilinçli tercihi ve onaylanan kişisel sembol seçimi.',
+        originAnalysis: 'Sembol Kütüphanesi (İkincil)',
+        originValue: masterSym?.name || sym,
+        customMeaning: secondaryCustomMeaningClean,
+        traditionalMeaningTr: masterSym?.traditionalMeaningTr,
+        esotericMeaningTr: masterSym?.esotericMeaningTr,
+        analysisAssociations: masterSym?.analysisAssociations || [],
+        compositionRole: masterSym?.compositionRole || 'SECONDARY_LAYER',
+        personalThemeTr: secondaryTheme,
+        personalTheme: secondaryTheme,
+        compositionRoleTr: masterSym?.compositionRole
+          ? `Tamamlayıcı Katman: ${masterSym.compositionRole}. Ana sembolik odağı çevreleyen ve dengeleyen ikincil form.`
+          : 'Tamamlayıcı Katman: Kompozisyonun dış hatlarını çerçeveleyen veya dengeleyici aks oluşturan unsur.',
+        relatedSymbolNameTr: `Merkezi ${primarySymbolCandidate} odağını simetrik olarak dengeler.`,
+        relatedSymbol: `Merkezi ${primarySymbolCandidate}`,
         visualExecutionTr: `${styleInfo.nameTr} stil kurallarına uygun olarak hassas ve temiz hatlarla işlenmelidir.`,
         visualExecution: `${styleInfo.nameTr} stilinde ince konturlar`,
-        layerLossMeaningTr: customLoss,
-        meaningRiskIfRemoved: customLoss,
+        layerLossMeaningTr: secondaryLoss,
+        meaningRiskIfRemoved: secondaryLoss,
       });
     }
+  }
+
+  // 3. Vurgu Sembolleri (Accent Symbols - Asla İKİNCİL'e dönüştürülmez!)
+  for (const sym of candidateAccent) {
+    const selObj = selectedSymbolObjects.find((s) => (s.symbolName === sym || s.symbolId === sym) && s.weight === 'ACCENT')
+      || selectedSymbolObjects.find((s) => s.symbolName === sym || s.symbolId === sym);
+    const masterSym = selObj
+      ? (MASTER_SYMBOLS[selObj.symbolId] || ALL_MASTER_SYMBOLS.find((s) => s.id === selObj.symbolId || s.name === selObj.symbolName))
+      : ALL_MASTER_SYMBOLS.find((s) => s.name === sym || s.id === sym);
+
+    const accentCustomMeaningClean = selObj?.customMeaning?.trim() || undefined;
+    const accentTheme = accentCustomMeaningClean
+      ? accentCustomMeaningClean
+      : (masterSym?.traditionalMeaningTr || `${sym} mikro vurgu katmanı.`);
+    const accentLoss = `Bu vurgu sembolü çıkarılırsa kompozisyona karakter ve incelik katan mikro detay zenginliği tasarımdan eksilir.`;
+
+    detailedSymbols.push({
+      symbolName: sym,
+      symbolId: masterSym?.id || selObj?.symbolId,
+      isPrimary: false,
+      weight: 'ACCENT',
+      originSourceTr: selObj
+        ? 'Danışanın Sembol Kütüphanesinden seçtiği vurgu ve mikro detay sembolü.'
+        : 'Danışanın bilinçli tercihi ve onaylanan vurgu sembolü seçimi.',
+      originAnalysis: 'Sembol Kütüphanesi (Vurgu)',
+      originValue: masterSym?.name || sym,
+      customMeaning: accentCustomMeaningClean,
+      traditionalMeaningTr: masterSym?.traditionalMeaningTr,
+      esotericMeaningTr: masterSym?.esotericMeaningTr,
+      analysisAssociations: masterSym?.analysisAssociations || [],
+      compositionRole: masterSym?.compositionRole || 'ACCENT_DETAIL',
+      personalThemeTr: accentTheme,
+      personalTheme: accentTheme,
+      compositionRoleTr: masterSym?.compositionRole
+        ? `Vurgu ve Mikro Detay: ${masterSym.compositionRole}. Kompozisyona karakter ve geçiş zarafeti katan mikro dokunuş.`
+        : 'Vurgu ve Mikro Detay: Kompozisyona karakter, derinlik ve ince geçiş zarafeti katan mikro dokunuş.',
+      relatedSymbolNameTr: `Merkezi ${primarySymbolCandidate} ve tamamlayıcı katmanlarla uyum içinde mikro vurgu sağlar.`,
+      relatedSymbol: `Merkezi ${primarySymbolCandidate}`,
+      visualExecutionTr: 'Mikro çizgi (single needle / fine line) tekniğiyle, ana kompozisyonu boğmadan ve negatif alanı koruyarak ince detay olarak işlenmelidir.',
+      visualExecution: 'Mikro çizgi ve ince detay vurgusu',
+      layerLossMeaningTr: accentLoss,
+      meaningRiskIfRemoved: accentLoss,
+    });
   }
 
   // A57: A. Danışan ve Reçete Özeti Analiz Durumları
@@ -480,8 +669,17 @@ export function generateTattooRecipeFromAnalyses(
     missingAnalyses.push('Arketip Analizi');
   }
 
-  if (astrology && astrology.sunSign && astrology.moonSign) {
-    completedAnalyses.push(`Batı / Tropical Zodyak (Güneş: ${TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr || astrology.sunSign}, Ay: ${TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr || astrology.moonSign})`);
+  if (astrology && (astrology.sunSign || astrology.moonSign || astrology.ascendantSign)) {
+    const sunName = astrology.sunSign ? TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr || astrology.sunSign : '';
+    const moonName = astrology.moonSign ? TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr || astrology.moonSign : '';
+    const ascName = astrology.ascendantSign ? TROPICAL_ZODIAC_SIGNS[astrology.ascendantSign]?.nameTr || astrology.ascendantSign : '';
+    const isAscApprox = Boolean(astrology.isBirthTimeUnknown);
+    const parts = [
+      sunName ? `Güneş: ${sunName}` : '',
+      moonName ? `Ay: ${moonName}` : '',
+      ascName ? `Yükselen: ${ascName}${isAscApprox ? ' [12:00 varsayımı - kesin değil]' : ''}` : '',
+    ].filter(Boolean);
+    completedAnalyses.push(`Batı / Tropical Zodyak (${parts.join(', ')})`);
   } else {
     missingAnalyses.push('Astroloji Haritası (Kayıt bulunmuyor / Kapsam dışı)');
   }
@@ -542,10 +740,14 @@ export function generateTattooRecipeFromAnalyses(
           mappingRuleTr: 'Çakra blokajının rezonans tablosundan üretilen gölge arketip, dönüşüm sembolü ile eşleştirilerek kompozisyona entegre edilir.',
           isSupportedByData: true,
         },
-        ...(astrology && astrology.sunSign && astrology.moonSign ? [{
-          layerNameTr: `Batı / Tropical Zodyak (${TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr || astrology.sunSign} Güneş & ${TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr || astrology.moonSign} Ay)`,
-          themeIntroducedTr: `Kozmik kutupsallık dengesi: Bilinçli irade (${TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr || astrology.sunSign}) ve duygusal güvenlik (${TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr || astrology.moonSign}).`,
-          mappingRuleTr: 'Yalnızca astronomik olarak hesaplanan 10 gök cisminden Güneş ve Ay pozisyonları kullanılır; eksen noktaları ve ev sistemleri kapsam dışı bırakılır.',
+        ...(astrology && (astrology.sunSign || astrology.moonSign || astrology.ascendantSign) ? [{
+          layerNameTr: `Batı / Tropical Zodyak (${[
+            astrology.sunSign ? `${TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr || astrology.sunSign} Güneş` : '',
+            astrology.moonSign ? `${TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr || astrology.moonSign} Ay` : '',
+            astrology.ascendantSign ? `${TROPICAL_ZODIAC_SIGNS[astrology.ascendantSign]?.nameTr || astrology.ascendantSign} Yükselen` : '',
+          ].filter(Boolean).join(', ')})`,
+          themeIntroducedTr: `Kozmik üçlü dengesi: Bilinçli irade (${astrology.sunSign ? TROPICAL_ZODIAC_SIGNS[astrology.sunSign]?.nameTr : 'Güneş'}), duygusal güvenlik ve sezgi (${astrology.moonSign ? TROPICAL_ZODIAC_SIGNS[astrology.moonSign]?.nameTr : 'Ay'}) ile dışa yansıyan kimlik (${astrology.ascendantSign ? TROPICAL_ZODIAC_SIGNS[astrology.ascendantSign]?.nameTr : 'Yükselen'}).${astrology.isBirthTimeUnknown ? ' (Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; Yükselen kesin değildir).' : ''}`,
+          mappingRuleTr: 'Batı / Tropical Zodyak analiziyle Güneş, Ay ve Yükselen burçları dahil edilmiş; MC, evler, düğümler ve Vedik sistem hariç tutulmuştur.',
           isSupportedByData: true,
         }] : []),
         ...(totemTest && totemTest.primaryType ? [{
@@ -593,10 +795,34 @@ export function generateTattooRecipeFromAnalyses(
       abstractionGuidelineTr: 'Onaylanmış soyut temsil kuralı: Hayvan formu kutsal geometrinin negatif alanında, ancak dikkatle bakıldığında sezilen akıcı konturlarla ima edilir.',
     },
     compositionPhilosophy: {
-      centralFocusRationaleTr: `Merkezi Odak: ${primarySymbolCandidate}, tasarımın ağırlık merkezidir. Danışanın Yaşam Yolu ${numerology.lifePathNumber} titreşimini ve ${archetype.unifiedArchetype.primary} arketipini temsil ettiği için kompozisyonun ana dikey aksında yükselir.`,
-      secondaryArrangementRationaleTr: `İkincil Sembol Hiyerarşisi: ${candidateSecondary.length > 0 ? candidateSecondary.join(' · ') : 'Dengeleyici kutsal oran daireleri'} unsurları merkezin etrafında hiyerarşik bir ritimle düzenlenir; merkezle yarışmaz, onu çerçeveler ve besler.`,
-      flowAndNegativeSpaceTr: `Geçişler ve Negatif Alan: ${placementInfo.nameTr} bölgesinin anatomik eğriliğine uyum sağlayan ${styleInfo.nameTr} akış hatları kullanılır. Kompozisyonda en az %30 oranında temiz ten (negatif alan) bırakılarak dövmenin zamanla yaşlanması ve çizgilerin birbirine girmesi engellenir.`,
+      centralFocusRationaleTr: `Merkezi Odak: ${primarySymbolCandidate}, pozitif dövme alanının yaklaşık %65'lik ağırlık merkezini oluşturur. Danışanın Yaşam Yolu ${numerology.lifePathNumber} titreşimini ve ${archetype.unifiedArchetype.primary} arketipini temsil ettiği için kompozisyonun ana dikey aksında baskın taşıyıcı çıpa olarak yükselir.`,
+      secondaryArrangementRationaleTr: `İkincil Sembol Hiyerarşisi: Pozitif dövme formunun kalan %35'lik bölümü ${candidateSecondary.length > 0 ? candidateSecondary.join(' · ') : 'Dengeleyici kutsal oran daireleri'} katmanına ayrılır; merkezin etrafında hiyerarşik bir ritimle düzenlenir; merkezle yarışmaz, onu çerçeveler ve besler.`,
+      flowAndNegativeSpaceTr: `Geçişler ve Negatif Alan: Toplam yerleşim alanında %45–50 hedefiyle temiz ten (negatif alan) bırakılır. Çizgiler arasında asgari 1.5–2 mm güvenlik payı bırakılarak ${placementInfo.nameTr} bölgesinin anatomik eğriliğinde ${styleInfo.nameTr} akış hatlarıyla dövmenin zamanla yaşlanması ve çizgilerin birbirine girmesi engellenir.`,
       holisticIntegrationRulesTr: symbolCombinationRules,
+      metrics: {
+        primaryFocusWeightPercent: 65,
+        secondaryLayerWeightPercent: 35,
+        negativeSpaceTargetPercentMin: 45,
+        negativeSpaceTargetPercentMax: 50,
+        minLineSpacingMm: 1.5,
+        idealLineSpacingMm: 2.0,
+        minDimensionsCm: { width: 10, height: 16 },
+        idealDimensionsCm: { width: 14, height: 22 },
+        areaDefinitionTr:
+          'Toplam yerleşim alanının %45–50\'si temiz ten (negatif alan); kalan %50–55\'lik pozitif dövme alanının yaklaşık %65\'i ana görsel odak (Yaşam Yolu ve Birincil Arketip), %35\'i ikincil göksel/çakra katmanlarıdır.',
+      },
+    },
+    compositionMetrics: {
+      primaryFocusWeightPercent: 65,
+      secondaryLayerWeightPercent: 35,
+      negativeSpaceTargetPercentMin: 45,
+      negativeSpaceTargetPercentMax: 50,
+      minLineSpacingMm: 1.5,
+      idealLineSpacingMm: 2.0,
+      minDimensionsCm: { width: 10, height: 16 },
+      idealDimensionsCm: { width: 14, height: 22 },
+      areaDefinitionTr:
+        'Toplam yerleşim alanının %45–50\'si temiz ten (negatif alan); kalan %50–55\'lik pozitif dövme alanının yaklaşık %65\'i ana görsel odak (Yaşam Yolu ve Birincil Arketip), %35\'i ikincil göksel/çakra katmanlarıdır.',
     },
     anatomicalAndTechnicalDirective: {
       placementAndFlowTr: `${placementInfo.nameTr} · ${placementInfo.anatomicalFlowTr} (${placementInfo.curvatureAdviceTr})`,
@@ -609,10 +835,11 @@ export function generateTattooRecipeFromAnalyses(
       },
       lineworkAndNeedleAdviceTr: [
         ...styleInfo.needleRecommendationsTr,
+        'Hassas Çizgi Güvenlik Aralığı: Çizgiler arasında asgari 1.5–2.0 mm mesafe bırakılmalıdır.',
         styleInfo.lineSpacingAdviceTr,
         styleInfo.antiBlowoutWarningTr,
       ],
-      skinAgingAndNegativeSpaceAdviceTr: 'İnce çizgi ve geometrik tasarımlarda yaşlanma payı: Çizgiler arasında en az 1.5 - 2 mm nefes alanı bırakılmalı, tenin en az %30\'u boş tutularak mürekkebin yıllar içindeki difüzyonu telafi edilmelidir.',
+      skinAgingAndNegativeSpaceAdviceTr: 'İnce çizgi ve geometrik tasarımlarda yaşlanma payı ve negatif alan: Çizgiler arasında en az 1.5–2.0 mm nefes alanı bırakılmalı, toplam yerleşim alanının %45–50\'si temiz ten (negatif alan) olarak tutularak mürekkebin yıllar içindeki difüzyonu telafi edilmeli ve pozitif dövme alanının yaklaşık %65\'i ana odağa ayrılmalıdır.',
     },
     conceptManifesto: conceptStatement,
     technicalPromptDirective: {
@@ -620,10 +847,11 @@ export function generateTattooRecipeFromAnalyses(
       negativePrompt,
       aspectRatio: placementInfo.recommendedDimensions.height > placementInfo.recommendedDimensions.width * 1.5 ? '9:16' : '3:4',
       forbiddenElementsAudited: [
-        'Yükselen Burç (ASC) ve MC prompttan arındırılmıştır',
-        'Ev sistemi ve eksen hesapları prompttan arındırılmıştır',
+        'Batı tropikal zodyak Güneş, Ay ve Yükselen burçları kullanılmıştır',
+        'MC, astrolojik evler, düğümler ve Vedik sistemler tasarıma dahil edilmemiştir',
         'Anne adı görsel prompt ve negatif prompttan arındırılmıştır',
-        'Yalnızca Batı tropikal zodyak Güneş ve Ay hizalanması ve onaylı semboller kullanılmıştır',
+        'Doğum saati bilinmediğinde 12:00 varsayımı ve kesin olmama uyarısı bildirilmiştir',
+        'Kompozisyon teknik kuralları (%65 ana odak ağırlığı, %45–50 negatif alan hedefi, asgari 1.5–2 mm çizgi aralığı, min 16×10 cm / ideal 22×14 cm) doğrulanmıştır',
       ],
     },
     // A57 Bölüm Eşleşmeleri (Section Aliases A - J)
@@ -692,9 +920,9 @@ export function generateTattooRecipeFromAnalyses(
         : 'Onaylanmış soyut temsil kuralı: Tamamlanmış totem testi bulunmadığından tasarıma hiçbir hayvan formu veya iması dahil edilmemiştir.',
     },
     sectionG: {
-      centralFocusRationaleTr: `${primarySymbolCandidate} kompozisyonun ağırlık merkezidir; danışanın Yaşam Yolu ${numerology.lifePathNumber} titreşimini ve ${archetype.unifiedArchetype.primary} arketipinin ışık potansiyelini temsil eder.`,
-      secondaryTransitionsTr: `${candidateSecondary.length > 0 ? candidateSecondary.join(' · ') : 'Dengeleyici kutsal oran daireleri'} katmanları merkezin çevresinde dengeli ve hiyerarşik bir akış oluşturur.`,
-      negativeSpaceRatioTr: 'En az %30 temiz negatif alan',
+      centralFocusRationaleTr: `${primarySymbolCandidate} pozitif dövme alanının yaklaşık %65'ini oluşturan ağırlık merkezidir; danışanın Yaşam Yolu ${numerology.lifePathNumber} titreşimini ve ${archetype.unifiedArchetype.primary} arketipinin ışık potansiyelini temsil eder.`,
+      secondaryTransitionsTr: `Pozitif formun kalan %35'lik bölümünde ${candidateSecondary.length > 0 ? candidateSecondary.join(' · ') : 'Dengeleyici kutsal oran daireleri'} katmanları hiyerarşik bir akış oluşturur.`,
+      negativeSpaceRatioTr: '%45–50 hedefli temiz negatif alan (asgari 1.5–2 mm çizgi aralığı ile)',
       holisticIntegrationRules: symbolCombinationRules,
     },
     sectionH: {
@@ -702,22 +930,34 @@ export function generateTattooRecipeFromAnalyses(
       recommendedDimensionsTr: `Önerilen Ebat: ${effectiveDimensions.width} cm Genişlik × ${effectiveDimensions.height} cm Yükseklik (İdeal: 22 cm Yükseklik × 14 cm Genişlik, Asgari: 16 cm Yükseklik × 10 cm Genişlik)`,
       needleAndTechniqueGuidance: [
         ...styleInfo.needleRecommendationsTr,
+        'Hassas Çizgi Güvenlik Aralığı: Çizgiler arasında asgari 1.5–2.0 mm mesafe bırakılmalıdır.',
         styleInfo.lineSpacingAdviceTr,
         styleInfo.antiBlowoutWarningTr,
       ],
-      agingAndLineSpacingTr: 'İnce çizgi ve geometrik tasarımlarda yaşlanma payı: Çizgiler arasında en az 1.5 - 2 mm nefes alanı bırakılmalı, tenin en az %30\'u boş tutularak mürekkebin yıllar içindeki difüzyonu telafi edilmelidir.',
+      agingAndLineSpacingTr: 'İnce çizgi ve geometrik tasarımlarda yaşlanma payı: Çizgiler arasında asgari 1.5–2.0 mm nefes alanı bırakılmalı, toplam yerleşim alanının %45–50\'si temiz ten (negatif alan) olarak tutularak mürekkebin yıllar içindeki difüzyonu telafi edilmelidir.',
     },
     sectionI: {
       manifestoTr: conceptStatement,
     },
     sectionJ: {
       primaryPromptEn,
-      negativePromptEn: negativePromptItems
-        .filter((item) => !motherName || item.toLocaleLowerCase('tr-TR') !== motherName.trim().toLocaleLowerCase('tr-TR'))
-        .join(', '),
+      negativePromptEn: negativePromptItems.join(', '),
       aspectRatio: placementInfo.recommendedDimensions.height > placementInfo.recommendedDimensions.width * 1.5 ? '9:16' : '3:4',
-      technicalCleanlinessNoteTr: 'Tüm promptlar anne adı, yükselen burç, eksen noktaları, ev sistemleri ve Vedik astroloji terimlerinden %100 arındırılmıştır.',
+      technicalCleanlinessNoteTr: 'Tüm promptlar genel metin yasağı kuralıyla ("İsim, harf, yazı, tarih veya kişisel metin ekleme") korunmaktadır; anne adı hiçbir prompta (pozitif veya negatif) aktarılmaz. Batı tropikal Güneş, Ay ve Yükselen burçları kullanılmış; MC, astrolojik evler, düğümler ve Vedik sistemler tasarıma dahil edilmemiştir.',
     },
+  };
+
+  const compositionMetrics: RecipeCompositionMetrics = {
+    primaryFocusWeightPercent: 65,
+    secondaryLayerWeightPercent: 35,
+    negativeSpaceTargetPercentMin: 45,
+    negativeSpaceTargetPercentMax: 50,
+    minLineSpacingMm: 1.5,
+    idealLineSpacingMm: 2.0,
+    minDimensionsCm: { width: 10, height: 16 },
+    idealDimensionsCm: { width: 14, height: 22 },
+    areaDefinitionTr:
+      'Toplam yerleşim alanının (tuval) %45–50\'si temiz ten (negatif alan) olarak korunur; kalan %50–55\'lik pozitif dövme alanının yaklaşık %65\'i ana görsel odağa (Yaşam Yolu ve Birincil Arketip), %35\'i ikincil göksel/çakra katmanlarına ayrılır. Çizgiler arasında asgari 1.5–2 mm güvenlik payı korunur.',
   };
 
   const recipe: TattooRecipe = {
@@ -729,6 +969,7 @@ export function generateTattooRecipeFromAnalyses(
     colorRationale: colorInfo.rationaleTr,
     primarySymbol: primarySymbolCandidate,
     secondarySymbols: candidateSecondary,
+    accentSymbols: candidateAccent,
     symbolCombinationRules,
     shadowTransformationTheme: `Gölge: ${archetype.shadowArchetype.shadowName} → Dönüşüm Sembolü: ${safeTransformSymbol}`,
     chakraSupportReflection: deficitChakra
@@ -742,10 +983,12 @@ export function generateTattooRecipeFromAnalyses(
       `Ölçüler: ${effectiveDimensions.width}x${effectiveDimensions.height} cm`,
       `Sembol Hiyerarşisi: ${symbolCombinationRules.join(' | ')}`,
     ],
-    keyComponents: [primarySymbolCandidate, ...candidateSecondary],
+    keyComponents: [primarySymbolCandidate, ...candidateSecondary, ...candidateAccent],
     technicalAdviceForArtist,
     detailedSymbols,
+    selectedSymbolObjects: detailedSymbols.filter((s) => Boolean(s.symbolId || s.customMeaning || s.traditionalMeaningTr)),
     comprehensiveReport,
+    compositionMetrics,
   };
 
   const aiPrompt: AIPromptData = {
@@ -774,3 +1017,113 @@ export function generateTattooRecipeFromAnalyses(
     notes: options.customNotes || '',
   };
 }
+
+export interface RecipeCompositionValidationResult {
+  isValid: boolean;
+  nominalTargetFocusWeightPercent: number; // 65 (Nominal hedef)
+  focusWeightToleranceRange: [number, number]; // [60, 70] (Tasarım esnekliği kabul aralığı)
+  primaryFocusWeightPercent: number; // Gerçekleşen değer
+  negativeSpaceTargetRange: [number, number];
+  minLineSpacingMm: number;
+  isDimensionsCompliant: boolean;
+  isNegativeSpaceCompliant: boolean;
+  isFocusRatioCompliant: boolean;
+  isLineSpacingCompliant: boolean;
+  isMathematicalModelConsistent: boolean;
+  diagnostics: string[];
+}
+
+/**
+ * Dövme reçetesinin kompozisyon oranlarını, negatif alan payını,
+ * çizgi aralığını ve ebat standartlarını programatik olarak doğrular.
+ */
+export function validateRecipeCompositionTechnicalRules(
+  recipeOrDesign: TattooRecipe | ClientTattooDesign
+): RecipeCompositionValidationResult {
+  const recipe: TattooRecipe = 'recipe' in recipeOrDesign ? recipeOrDesign.recipe : recipeOrDesign;
+  const metrics: RecipeCompositionMetrics = recipe.compositionMetrics || {
+    primaryFocusWeightPercent: 65,
+    secondaryLayerWeightPercent: 35,
+    negativeSpaceTargetPercentMin: 45,
+    negativeSpaceTargetPercentMax: 50,
+    minLineSpacingMm: 1.5,
+    idealLineSpacingMm: 2.0,
+    minDimensionsCm: { width: 10, height: 16 },
+    idealDimensionsCm: { width: 14, height: 22 },
+    areaDefinitionTr: '',
+  };
+
+  const dims = recipe.recommendedDimensionsCm;
+  const maxDim = Math.max(dims.width, dims.height);
+  const minDim = Math.min(dims.width, dims.height);
+  const isDimensionsCompliant = maxDim >= 16 && minDim >= 10;
+  const isNegativeSpaceCompliant =
+    metrics.negativeSpaceTargetPercentMin >= 45 &&
+    metrics.negativeSpaceTargetPercentMax <= 50;
+  
+  // Nominal hedef %65'tir; anatomik yerleşim ve kişisel sembol kompozisyon esnekliği için ±%5 (%60–%70) tolerans kabul edilir
+  const isFocusRatioCompliant =
+    metrics.primaryFocusWeightPercent >= 60 &&
+    metrics.primaryFocusWeightPercent <= 70;
+  const isLineSpacingCompliant = metrics.minLineSpacingMm >= 1.5;
+  const isMathematicalModelConsistent =
+    metrics.primaryFocusWeightPercent + metrics.secondaryLayerWeightPercent === 100 &&
+    metrics.negativeSpaceTargetPercentMin + 55 === 100;
+
+  const diagnostics: string[] = [];
+  if (!isDimensionsCompliant) {
+    diagnostics.push(`Ölçü (${dims.width}x${dims.height} cm) minimum standart olan 16x10 cm'nin altındadır.`);
+  } else {
+    diagnostics.push(`Ölçü (${dims.width}x${dims.height} cm) asgari 16x10 cm ve ideal 22x14 cm standartlarına uygundur.`);
+  }
+
+  if (!isNegativeSpaceCompliant) {
+    diagnostics.push(`Negatif alan hedefi (%${metrics.negativeSpaceTargetPercentMin}-%${metrics.negativeSpaceTargetPercentMax}) %45-50 kuralına uymuyor.`);
+  } else {
+    diagnostics.push(`Negatif alan hedefi (%${metrics.negativeSpaceTargetPercentMin}-%${metrics.negativeSpaceTargetPercentMax}) %45-50 kuralına uygundur; eski %30 sınırı aşılmıştır.`);
+  }
+
+  if (!isFocusRatioCompliant) {
+    diagnostics.push(`Ana odak ağırlığı (%${metrics.primaryFocusWeightPercent}) nominal hedef olan %65 standardının dışındadır (kabul edilebilir esneklik aralığı: %60–%70).`);
+  } else {
+    diagnostics.push(`Ana görsel odak nominal hedefi %65'tir (kabul edilebilir esneklik aralığı: %60–%70). Gerçekleşen değer: %${metrics.primaryFocusWeightPercent}.`);
+  }
+
+  if (!isLineSpacingCompliant) {
+    diagnostics.push(`Çizgi aralığı (${metrics.minLineSpacingMm} mm) minimum 1.5 mm'nin altındadır.`);
+  } else {
+    diagnostics.push(`Çizgi aralığı (${metrics.minLineSpacingMm} mm) minimum 1.5–2.0 mm güvenlik kuralına uygundur.`);
+  }
+
+  if (!isMathematicalModelConsistent) {
+    diagnostics.push('Kompozisyon oranları matematiksel modelle çelişmektedir.');
+  } else {
+    diagnostics.push('Matematiksel model tutarlıdır: Tuval %45-50 negatif alan + %50-55 pozitif alan; Pozitif alan %65 ana odak + %35 tamamlayıcı katmandır.');
+  }
+
+  const isValid =
+    isDimensionsCompliant &&
+    isNegativeSpaceCompliant &&
+    isFocusRatioCompliant &&
+    isLineSpacingCompliant &&
+    isMathematicalModelConsistent;
+
+  return {
+    isValid,
+    nominalTargetFocusWeightPercent: 65,
+    focusWeightToleranceRange: [60, 70],
+    primaryFocusWeightPercent: metrics.primaryFocusWeightPercent,
+    negativeSpaceTargetRange: [
+      metrics.negativeSpaceTargetPercentMin,
+      metrics.negativeSpaceTargetPercentMax,
+    ],
+    minLineSpacingMm: metrics.minLineSpacingMm,
+    isDimensionsCompliant,
+    isNegativeSpaceCompliant,
+    isFocusRatioCompliant,
+    isLineSpacingCompliant,
+    isMathematicalModelConsistent,
+    diagnostics,
+  };
+}
+

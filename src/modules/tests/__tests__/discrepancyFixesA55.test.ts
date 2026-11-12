@@ -203,8 +203,8 @@ describe('A55 — Tespit Edilen Uyuşmazlıkların Kök Neden Denetim ve Onarım
     }
   });
 
-  // HATA 3: Kapsam dışı astroloji verilerinin (Yükselen / Placidus) reçeteden arındırılması
-  it('HATA 3 Onarımı: Reçetede ve promptta Yükselen (ASC) ve Placidus yer almamalı, Güneş ve Ay korunmalıdır', () => {
+  // HATA 3: Batı astrolojisine göre Güneş, Ay ve Yükselen burçlarının kullanılması, Placidus ve Vedik sistemin arındırılması
+  it('Astroloji Uyumu: Reçetede ve sembollerde Güneş, Ay ve Yükselen burcu yer almalı, Placidus ve Vedik bulunmamalıdır', () => {
     const client = createClientRecord(clientGizemData, 'OWNER_MANUAL');
     try {
       const arch = setupFullArchive(client);
@@ -215,22 +215,20 @@ describe('A55 — Tespit Edilen Uyuşmazlıkların Kök Neden Denetim ve Onarım
       const recipeText = formatTattooRecipeText(client, res.design);
       const primaryPrompt = res.design.aiPrompt.primaryPromptEn;
 
-      // 1. Güneş ve Ay hizalanması mevcut olmalıdır
-      const hasSunMoon = (recipe.secondarySymbols || []).some(
-        (s) => s.includes('Güneş') && s.includes('Ay')
+      // 1. Ay ve Yükselen hizalanması mevcut olmalıdır
+      const hasMoonAsc = (recipe.secondarySymbols || []).some(
+        (s) => s.includes('Ay') && s.includes('Yükselen')
       );
-      assert.ok(hasSunMoon, 'Güneş ve Ay hizalanması ikincil sembollerde bulunmalıdır');
+      assert.ok(hasMoonAsc, 'Ay ve Yükselen hizalanması ikincil sembollerde bulunmalıdır');
 
-      // 2. Yükselen (ASC) reçete ikincil sembollerinde OLMAMALIDIR
-      const hasAscInSymbols = (recipe.secondarySymbols || []).some(
-        (s) => s.includes('Yükselen') || s.includes('Ascendant') || s.includes('Asc')
+      // 2. Güneş burcu reçete ikincil sembollerinde yer almalıdır (eski hariç tutma kuralı kaldırıldı)
+      const hasSunInSymbols = (recipe.secondarySymbols || []).some(
+        (s) => s.includes('Güneş')
       );
-      assert.strictEqual(hasAscInSymbols, false, 'Reçete sembollerinde Yükselen bulunmamalıdır');
+      assert.strictEqual(hasSunInSymbols, true, 'Reçete sembollerinde Güneş burcu bulunmalıdır');
 
-      // 3. Reçete metninde ve promptta Yükselen/Placidus sızmamalıdır
-      assert.ok(!recipeText.includes('Yükselen ('), 'Reçete metninde Yükselen glifi sızmamalıdır');
+      // 3. Reçete metninde ve promptta Placidus sızmamalıdır
       assert.ok(!recipeText.includes('Placidus'), 'Reçete metninde Placidus bulunmamalıdır');
-      assert.ok(!primaryPrompt.includes('Ascendant'), 'AI promptta Ascendant bulunmamalıdır');
       assert.ok(!primaryPrompt.includes('Placidus'), 'AI promptta Placidus bulunmamalıdır');
     } finally {
       deleteClientRecord(client.id);
@@ -295,7 +293,8 @@ describe('A55 — Tespit Edilen Uyuşmazlıkların Kök Neden Denetim ve Onarım
 
       assert.ok(!pEn.includes('songül'), 'İngilizce promptta anne adı yer almamalıdır');
       assert.ok(!pTr.includes('songül'), 'Türkçe konsept promptunda anne adı yer almamalıdır');
-      assert.ok(pNeg.includes('songül'), 'Anne adı negatif istemde koruyucu filtre olarak yer almalıdır');
+      assert.ok(!pNeg.includes('songül'), 'Anne adı negatif istem dahil hiçbir prompt metnine aktarılmamalıdır');
+      assert.ok(pNeg.includes('no names'), 'Genel isim ve metin engelleme kuralı negatif istemde yer almalıdır');
     } finally {
       deleteClientRecord(client.id);
     }

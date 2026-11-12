@@ -1,4 +1,5 @@
 import { NumerologyAnalysis } from '../../types/analysis';
+import { Client } from '../../types/client';
 import {
   PYTHAGOREAN_MAP,
   TURKISH_CHAR_MAP,
@@ -235,6 +236,8 @@ export function calculateNumerologyMatrix(
   );
 
   return {
+    fullName: cleanName,
+    birthDate: cleanBirthDate,
     lifePathNumber,
     destinyNumber,
     soulUrgeNumber,
@@ -245,3 +248,49 @@ export function calculateNumerologyMatrix(
     masterNumbers,
   };
 }
+
+/**
+ * Danışanın güncel ad, soyad ve doğum tarihi verileri ile kayıtlı Numeroloji analizini karşılaştırır.
+ * Ad, soyad veya doğum tarihi değişmişse eski numeroloji sonucu geçersiz (stale) kabul edilir ve true döner.
+ */
+export function isNumerologyStale(
+  numerology: NumerologyAnalysis | null | undefined,
+  client: Client | null | undefined
+): boolean {
+  if (!numerology || !client) return true;
+
+  const currentFullName = [(client.firstName || '').trim(), (client.lastName || '').trim()].filter(Boolean).join(' ').trim();
+  const currentBirthDate = (client.birthDate || '').trim();
+
+  if (!currentFullName || !currentBirthDate) return true;
+
+  // 1. Hesaplama girdi üstverisi (metadata) eşleşmesi (Tam ad ve doğum tarihi)
+  const hasRecordedFullName = typeof numerology.fullName === 'string' && numerology.fullName.trim().length > 0;
+  const hasRecordedBirthDate = typeof numerology.birthDate === 'string' && numerology.birthDate.trim().length > 0;
+
+  if (hasRecordedFullName) {
+    const normRecorded = numerology.fullName!.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+    const normCurrent = currentFullName.replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+    if (normRecorded !== normCurrent) {
+      return true;
+    }
+  }
+
+  if (hasRecordedBirthDate) {
+    if (numerology.birthDate!.trim() !== currentBirthDate) {
+      return true;
+    }
+  }
+
+  // 2. Geriye dönük uyumluluk / mock nesneler:
+  // Eğer hem fullName hem birthDate üstverisi nesnede bulunmuyorsa temel sayıların varlığını doğrula.
+  if (!hasRecordedFullName && !hasRecordedBirthDate) {
+    if (typeof numerology.lifePathNumber !== 'number' || typeof numerology.destinyNumber !== 'number') {
+      return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+

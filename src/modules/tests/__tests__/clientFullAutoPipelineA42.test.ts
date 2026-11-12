@@ -253,8 +253,12 @@ describe('A42 — Yeni Danışan Kaydından Tam Otomatik Analiz ve Tasarım Zinc
       'Anne adı ikincil sembollerde geçemez.'
     );
     assert.ok(
-      result.designData?.aiPrompt.negativePrompt.toLocaleLowerCase('tr-TR').includes(motherName),
-      'Anne adı negatif prompta eklenerek AI sızıntısı engellenmelidir.'
+      !result.designData?.aiPrompt.negativePrompt.toLocaleLowerCase('tr-TR').includes(motherName),
+      'Anne adı negatif prompta aktarılmamalıdır.'
+    );
+    assert.ok(
+      result.designData?.aiPrompt.negativePrompt.includes('no names'),
+      'Genel isim engelleme kuralı negatif promptta bulunmalıdır.'
     );
   });
 
@@ -277,10 +281,10 @@ describe('A42 — Yeni Danışan Kaydından Tam Otomatik Analiz ve Tasarım Zinc
     const reResult = runClientFullPipeline(client, { forceRegenerateDesign: true });
 
     assert.equal(reResult.recipeRan, true);
-    assert.equal(reResult.designData?.versionNumber, 2, 'Yeni sürüm (V2) oluşmalıdır.');
+    assert.equal(reResult.designData?.versionNumber, 1, 'Tekil güncel kayıt ilkesi: sabit aktif sürüm 1 olmalıdır.');
 
     const archiveAfter = getClientArchive(client.id);
-    assert.equal(archiveAfter?.designs.length, 2, 'Arşivde her iki sürüm de saklanmalıdır.');
+    assert.equal(archiveAfter?.designs.length, 1, 'Tekil güncel kayıt ilkesi: önceki tasarım silinmeli ve yalnızca güncel tasarım kalmalıdır.');
   });
 
   // 13. Senaryo: Kullanıcının bilinçli stil/yerleşim seçimi yaptığında bu seçimin korunması

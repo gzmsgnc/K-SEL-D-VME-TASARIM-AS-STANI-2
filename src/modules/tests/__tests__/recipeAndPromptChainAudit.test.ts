@@ -219,8 +219,8 @@ describe('A15-A16 Son Kontrol: Reçete ve Görsel İstem Zinciri Denetim Testler
       const primSym = (res.design.recipe.primarySymbol || '').toLocaleLowerCase('tr-TR');
 
       assert.ok(!pEn.includes('gülseren'), 'Anne adı İngilizce isteme sızmamalı');
-      assert.ok(!pTr.includes('gülseren'), 'Anne adı Türkçe konsepte sızmamalı');
-      assert.ok(pNeg.includes('gülseren'), 'Anne adı koruyucu filtre olarak negatif istemde bulunabilir');
+      assert.ok(!pNeg.includes('gülseren'), 'Anne adı negatif isteme de aktarılmamalıdır');
+      assert.ok(pNeg.includes('no names'), 'Genel metin/isim yasağı negatif istemde yer almalıdır');
       assert.ok(!primSym.includes('gülseren'), 'Anne adı ana sembole sızmamalı');
 
       // A16 çıktısı kontrolü
@@ -307,7 +307,7 @@ describe('A15-A16 Son Kontrol: Reçete ve Görsel İstem Zinciri Denetim Testler
   });
 
   // 9. Sürüm koruması
-  it('9. Sürüm koruması', () => {
+  it('9. Tekil güncel kayıt ilkesi: Yeni tasarım kaydedildiğinde önceki silinir', () => {
     const client = createClientRecord(clientDataA, 'OWNER_MANUAL');
     try {
       let arch = setupFullAnalyses(client);
@@ -319,16 +319,16 @@ describe('A15-A16 Son Kontrol: Reçete ve Görsel İstem Zinciri Denetim Testler
       saveClientDesign(client.id, d2);
 
       const finalArch = getClientArchive(client.id);
-      assert.strictEqual(finalArch?.designs.length, 2, 'İki sürüm de korunmalıdır');
+      assert.strictEqual(finalArch?.designs.length, 1, 'Tekil güncel kayıt ilkesi: yalnızca 1 tasarım kalmalıdır');
       assert.strictEqual(finalArch?.designs[0].versionNumber, 1);
-      assert.strictEqual(finalArch?.designs[1].versionNumber, 2);
+      assert.strictEqual(finalArch?.designs[0].recipe.style, 'FINE_LINE');
     } finally {
       deleteClientRecord(client.id);
     }
   });
 
-  // 10. Geçmiş sürüm salt okunurluğu
-  it('10. Geçmiş sürüm salt okunurluğu', () => {
+  // 10. Güncel tasarım kaydının deterministik ve eksiksiz güncellenmesi
+  it('10. Güncel tasarım kaydının deterministik ve eksiksiz güncellenmesi', () => {
     const client = createClientRecord(clientDataA, 'OWNER_MANUAL');
     try {
       let arch = setupFullAnalyses(client);
@@ -340,12 +340,11 @@ describe('A15-A16 Son Kontrol: Reçete ve Görsel İstem Zinciri Denetim Testler
       saveClientDesign(client.id, d2);
 
       const latestArch = getClientArchive(client.id)!;
-      const v1 = latestArch.designs.find((d) => d.versionNumber === 1);
-      const v2 = latestArch.designs.find((d) => d.versionNumber === 2);
+      assert.strictEqual(latestArch.designs.length, 1);
+      const current = latestArch.designs[0];
 
-      assert.notStrictEqual(v1?.id, v2?.id);
-      assert.strictEqual(v1?.recipe.style, 'SACRED_GEOMETRY');
-      assert.strictEqual(v2?.recipe.style, 'FINE_LINE');
+      assert.strictEqual(current.recipe.style, 'FINE_LINE');
+      assert.strictEqual(current.versionNumber, 1);
     } finally {
       deleteClientRecord(client.id);
     }

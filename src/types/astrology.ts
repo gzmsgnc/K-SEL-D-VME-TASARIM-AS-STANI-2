@@ -80,13 +80,17 @@ export interface TropicalNatalChart {
   timezone: string;
   utcOffsetMinutes: number;
   
-  // Yükselen Burç (Saat biliniyorsa hesaplanır, bilinmiyorsa tanımsız)
+  // Yükselen Burç (Saat biliniyorsa kesin, bilinmiyorsa 12:00 varsayımıyla hesaplanır ve kesin olmadığı belirtilir)
   ascendantSign?: ZodiacSign;
   ascendantDegree?: number;
   ascendantMinute?: number;
   formattedAscendantTr?: string;
+  isAscendantDefinitive?: boolean;
+  ascendantNoticeTr?: string;
   sunSign?: ZodiacSign;
   moonSign?: ZodiacSign;
+  isNoonReference?: boolean;        // Doğum saati bilinmediğinde öğle 12:00 varsayımı
+  timeUncertaintyNoticeTr?: string; // Doğum saati belirsizliği ve sapma payı Türkçe bilgilendirme notu
   planetaryPositions?: CelestialBodyPosition[];
   houseCusps?: HouseCusp[];
   aspects?: AspectData[];

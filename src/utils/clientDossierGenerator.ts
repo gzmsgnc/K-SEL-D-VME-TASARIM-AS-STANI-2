@@ -83,7 +83,7 @@ export function generateClientDossierText(
     const moonSignTr = astro.moonSign ? (TROPICAL_ZODIAC_SIGNS[astro.moonSign]?.nameTr || astro.moonSign) : 'Belirtilmedi';
     const risingSignTr = astro.ascendantSign
       ? (astro.formattedAscendantTr || (TROPICAL_ZODIAC_SIGNS[astro.ascendantSign]?.nameTr || astro.ascendantSign))
-      : 'Doğum saati bilinmediğinden hesaplanmadı (12:00 öğle referansı varsayımı)';
+      : 'Doğum saati bilinmediği için 12:00 varsayımı kullanılmıştır; bu durumda Yükselen burç sonucu kesin değildir (hesaplanamaz)';
     const planetsList = (astro.planetaryPositions || [])
       .map((p) => `  - ${p.body}: ${TROPICAL_ZODIAC_SIGNS[p.sign]?.nameTr || p.sign} (${p.degree.toFixed(1)}°) [Ev ${p.houseNumber || '-'}]`)
       .join('\n');

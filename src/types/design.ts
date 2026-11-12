@@ -26,6 +26,7 @@ export type BodyPlacement =
 
 export interface DetailedSymbolRationale {
   symbolName: string;                     // 1. Sembolün adı
+  symbolId?: string;                      // Master kütüphanedeki değişmez sembol kimliği
   originSourceTr: string;                 // 2. Hangi analiz sonucu veya tasarım tercihi nedeniyle seçildi
   personalThemeTr: string;                // 3. Temsil ettiği kişisel tema
   compositionRoleTr: string;              // 4. Kompozisyondaki görevi
@@ -33,15 +34,31 @@ export interface DetailedSymbolRationale {
   visualExecutionTr: string;              // 6. Görsel olarak nasıl işlenmeli
   layerLossMeaningTr: string;             // 7. Sembol çıkarılırsa tasarımın hangi anlam katmanı kaybolur
   isPrimary: boolean;
+  weight?: 'PRIMARY' | 'SECONDARY' | 'ACCENT'; // BİRİNCİL, İKİNCİL veya VURGU (Üç bağımsız ağırlık)
+  customMeaning?: string;                 // Danışanın girdiği kişisel niyet (varsa, boşsa uydurma metin yok)
+  traditionalMeaningTr?: string;          // Master kütüphane kadim/tarihsel anlamı
+  esotericMeaningTr?: string;             // Master kütüphane modern ezoterik anlamı
+  analysisAssociations?: { module: string; target: string; rationaleTr: string }[]; // İlgili analiz bağlantıları
+  compositionRole?: string;               // Kompozisyondaki rolü
   // Uyumluluk ve formatlama alanları
   originAnalysis?: string;
   originValue?: string;
   personalTheme?: string;
-  compositionRole?: string;
   relatedSymbol?: string;
   visualExecution?: string;
   meaningRiskIfRemoved?: string;
-  weight?: 'PRIMARY' | 'SECONDARY';
+}
+
+export interface RecipeCompositionMetrics {
+  primaryFocusWeightPercent: number; // 65 (Ana görsel odak: pozitif dövme alanının ~%65'i)
+  secondaryLayerWeightPercent: number; // 35 (Tamamlayıcı katmanlar: pozitif dövme alanının ~%35'i)
+  negativeSpaceTargetPercentMin: number; // 45 (%45-50 ten nefes alanı)
+  negativeSpaceTargetPercentMax: number; // 50
+  minLineSpacingMm: number; // 1.5 mm
+  idealLineSpacingMm: number; // 2.0 mm
+  minDimensionsCm: { width: number; height: number }; // 10 x 16 (veya 16 x 10)
+  idealDimensionsCm: { width: number; height: number }; // 14 x 22 (veya 22 x 14)
+  areaDefinitionTr: string; // Net matematiksel tanım
 }
 
 export interface ComprehensiveDesignReport {
@@ -94,7 +111,9 @@ export interface ComprehensiveDesignReport {
     secondaryArrangementRationaleTr: string;
     flowAndNegativeSpaceTr: string;
     holisticIntegrationRulesTr: string[];
+    metrics?: RecipeCompositionMetrics;
   };
+  compositionMetrics?: RecipeCompositionMetrics;
   anatomicalAndTechnicalDirective: {
     placementAndFlowTr: string;
     dimensionsExplicit: {
@@ -198,6 +217,7 @@ export interface TattooRecipe {
   colorRationale?: string;        // Renk profili ve sembolik gerekçesi
   primarySymbol?: string;         // Ana sembol
   secondarySymbols?: string[];    // İkincil semboller
+  accentSymbols?: string[];       // Vurgu sembolleri (Asla ikincile dönüştürülmez)
   symbolCombinationRules?: string[]; // Sembollerin kompozisyondaki hiyerarşisi
   shadowTransformationTheme?: string; // Gölge arketipin dönüştürücü teması
   chakraSupportReflection?: string;   // Çakra desteğinin tasarıma yansıması
@@ -206,8 +226,10 @@ export interface TattooRecipe {
   artistVisualDirection?: string[];   // Tasarımcıya yönelik görsel yönlendirmeler
   keyComponents: string[];        // Dövmede yer alacak temel unsurlar ve semboller
   technicalAdviceForArtist: string[]; // Dövme sanatçısına yönelik teknik tavsiyeler (iğne no, gölgeleme derinliği vb.)
-  detailedSymbols?: DetailedSymbolRationale[]; // A57: Her sembol için ayrıntılı ve gerekçeli açıklama
+  detailedSymbols?: DetailedSymbolRationale[]; // A57 & A64: Her sembol için ayrıntılı ve gerekçeli açıklama
+  selectedSymbolObjects?: DetailedSymbolRationale[]; // Reçeteye aktarılan tam sembol nesneleri
   comprehensiveReport?: ComprehensiveDesignReport; // A57: 10 Bölümlü Danışana Sunulabilir Kişisel Tasarım Raporu
+  compositionMetrics?: RecipeCompositionMetrics; // Kesin teknik kompozisyon metrikleri (%65 odak, %45-50 negatif alan, 1.5-2mm aralık, 16x10 / 22x14cm)
 }
 
 export interface AIPromptData {
@@ -217,6 +239,21 @@ export interface AIPromptData {
   aspectRatio: '1:1' | '3:4' | '9:16' | '16:9';
   artisticModifiers: string[];    // Sanatçı referansları, ışık ve doku belirteçleri
   seed?: number;
+}
+
+/**
+ * Sunucu tarafı doğrulanmış PNG görsel teknik meta verileri (Aşama 5.4.1 & 5.4.2)
+ */
+export interface TattooImageDimensions {
+  width: number;
+  height: number;
+  aspectRatio: string;
+  orientation: 'vertical' | 'square' | 'horizontal';
+  bitDepth: number;
+  colorType: string;
+  fileSizeBytes?: number;
+  format: 'PNG';
+  verified: boolean;
 }
 
 /**
@@ -230,7 +267,14 @@ export interface ClientTattooDesign {
   conceptStatement: string;       // Felsefi ve ruhsal konsept manifestosu
   recipe: TattooRecipe;           // Detaylı Dövme Tarifi
   aiPrompt: AIPromptData;         // Yapay Zekâ Görsel Üretim İstemleri
+  imageUrl?: string;              // Sunucu yerel görsel göreli URL'si (/api/tattoo-images/:clientId/:fileId)
+  imageFileId?: string;           // Sunucudaki görsel dosya UUID kimliği
+  imageModelUsed?: string;        // Üretimde kullanılan model
+  imageGeneratedAt?: string;      // Üretim tarihi
+  imageDimensions?: TattooImageDimensions; // Sunucu tarafından doğrulanmış teknik IHDR meta verileri
   createdAt: string;              // Oluşturulma tarihi
   updatedAt: string;
   notes?: string;                 // Tasarımcı / Danışman notları
+  isCompleted?: boolean;          // Tasarım süreci tamamlandı mı?
+  completedAt?: string;           // Tamamlanma zamanı
 }

@@ -201,9 +201,329 @@ export const TOTEM_QUESTIONS: TestQuestion[] = [
 ];
 
 /**
- * 10 Soruluk Cevap Matrisinden Hayvan Totemini Hesaplar
+ * A62: Soru Önem Ağırlıkları (Secondary Question Category Weights)
+ * Karakter Özü ve Gölge/Derinlik soruları en yüksek ağırlığa sahiptir.
+ */
+export const QUESTION_IMPORTANCE_WEIGHTS: Record<string, number> = {
+  tot_q9: 1.50, // Karakter Özü (Core Identity & Essence)
+  tot_q10: 1.40, // Gölge ve Derinlik (Shadow & Depth)
+  tot_q4: 1.25, // Güç ve Yetenek (Core Strength)
+  tot_q2: 1.20, // Tehlike ve Tehdit (Crisis Instinct)
+  tot_q6: 1.15, // Zorluklarla Yüzleşme (Adversity Navigation)
+  tot_q7: 1.10, // Av ve Hedef (Strategy & Focus)
+  tot_q8: 1.05, // Sezgi ve Görünmeyen (Intuition)
+  tot_q3: 1.00, // Zaman ve Ritim (Temporal Rhythm)
+  tot_q1: 0.90, // Doğal Yaşam Alanı (Habitat)
+  tot_q5: 0.85, // Yalnızlık ve Topluluk (Social Balance)
+};
+
+export interface AnimalCharacteristicProfile {
+  canonicalOrder: number; // 0..8: Kurt, Şahin, Ayı, Baykuş, Yılan, Geyik, Jaguar, Kartal, Yunus
+  primaryDomains: string[];
+}
+
+/**
+ * A62: 9 Totem Hayvanının Doğal Element ve Karakteristik Alan Profilleri
+ */
+export const TOTEM_ANIMAL_CHARACTERISTICS: Record<string, AnimalCharacteristicProfile> = {
+  Kurt: {
+    canonicalOrder: 0,
+    primaryDomains: ['toprak', 'ay', 'suru', 'sadakat', 'orman'],
+  },
+  Şahin: {
+    canonicalOrder: 1,
+    primaryDomains: ['hava', 'isik', 'vizyon', 'odak', 'yuksek'],
+  },
+  Ayı: {
+    canonicalOrder: 2,
+    primaryDomains: ['toprak', 'mukavemet', 'yalnizlik', 'sifa', 'magara'],
+  },
+  Baykuş: {
+    canonicalOrder: 3,
+    primaryDomains: ['hava', 'gece', 'sezgi', 'bilgelik', 'gizem'],
+  },
+  Yılan: {
+    canonicalOrder: 4,
+    primaryDomains: ['toprak', 'su', 'donusum', 'simya', 'kabuk'],
+  },
+  Geyik: {
+    canonicalOrder: 5,
+    primaryDomains: ['orman', 'su', 'zarafet', 'incelik', 'saf'],
+  },
+  Jaguar: {
+    canonicalOrder: 6,
+    primaryDomains: ['ates', 'golge', 'gizlilik', 'avci', 'atilim'],
+  },
+  Kartal: {
+    canonicalOrder: 7,
+    primaryDomains: ['hava', 'eter', 'ozgurluk', 'ilahi', 'firtina'],
+  },
+  Yunus: {
+    canonicalOrder: 8,
+    primaryDomains: ['su', 'nefes', 'nese', 'akiskalik', 'sosyal'],
+  },
+};
+
+/**
+ * A62: Kesin ve Ayrık (Strictly Distinct) Yüzde Dağıtım Algoritması
+ * Her hayvanın yüzdesi birbirinden farklıdır ve toplamı kesinlikle %100.0 eder.
+ */
+export function computeDistinctPercentages(sortedPriorityScores: number[]): number[] {
+  const n = sortedPriorityScores.length;
+  if (n === 0) return [];
+  const total = sortedPriorityScores.reduce((sum, v) => sum + v, 0);
+  const safeTotal = total > 0 ? total : 1;
+
+  // 1. İlk orantısal yüzdeler (1 ondalık basamağa yuvarlanmış)
+  let pcts = sortedPriorityScores.map((score) => {
+    return Math.round(((score / safeTotal) * 100) * 10) / 10;
+  });
+
+  // 2. Taban payı kontrolü: Her sıranın en azından katı azalan olabilmesi için minimum pay
+  for (let i = n - 1; i >= 0; i--) {
+    const minRequired = Math.round((n - i) * 0.1 * 10) / 10;
+    if (pcts[i] < minRequired) {
+      pcts[i] = minRequired;
+    }
+  }
+
+  // Katı azalanlık kuralını sağla: pcts[i] > pcts[i+1]
+  for (let i = n - 2; i >= 0; i--) {
+    if (pcts[i] <= pcts[i + 1]) {
+      pcts[i] = Math.round((pcts[i + 1] + 0.1) * 10) / 10;
+    }
+  }
+
+  // 3. Toplamı kesinlikle 100.0 yapacak şekilde kalibre et (katı azalanlığı bozmadan)
+  let currentSum = Math.round(pcts.reduce((a, b) => a + b, 0) * 10) / 10;
+  let diff = Math.round((100.0 - currentSum) * 10) / 10;
+
+  let iterations = 0;
+  while (Math.abs(diff) > 0.001 && iterations < 500) {
+    iterations++;
+    if (diff > 0) {
+      // 0.1 ekleme: pcts[i] + 0.1 < pcts[i-1] şartını sağlayan en yüksek öncelikli elemana ekle
+      let added = false;
+      for (let i = 0; i < n; i++) {
+        const canAdd = i === 0 || (Math.round((pcts[i] + 0.1) * 10) / 10 < pcts[i - 1]);
+        if (canAdd) {
+          pcts[i] = Math.round((pcts[i] + 0.1) * 10) / 10;
+          diff = Math.round((diff - 0.1) * 10) / 10;
+          added = true;
+          break;
+        }
+      }
+      if (!added) {
+        pcts[0] = Math.round((pcts[0] + 0.1) * 10) / 10;
+        diff = Math.round((diff - 0.1) * 10) / 10;
+      }
+    } else {
+      // diff < 0: 0.1 çıkarma
+      let subtracted = false;
+      for (let i = n - 1; i >= 0; i--) {
+        const canSub =
+          i === n - 1
+            ? pcts[i] > 0.15
+            : Math.round((pcts[i] - 0.1) * 10) / 10 > pcts[i + 1];
+        if (canSub) {
+          pcts[i] = Math.round((pcts[i] - 0.1) * 10) / 10;
+          diff = Math.round((diff + 0.1) * 10) / 10;
+          subtracted = true;
+          break;
+        }
+      }
+      if (!subtracted) {
+        pcts[0] = Math.round((pcts[0] + 0.1) * 10) / 10;
+        diff = Math.round((diff - 0.1) * 10) / 10;
+      }
+    }
+  }
+
+  return pcts;
+}
+
+/**
+ * A62: Deterministik İkincil Eşleştirme ve Önceliklendirme Motoru
+ * Ham puanların yanı sıra soru kategori ağırlıklarını, elementer rezonansı
+ * ve deterministik canonical imzayı kullanarak 9 hayvanı sıralar.
+ */
+/**
+ * A62: Deterministik İkincil Eşleştirme ve Önceliklendirme Motoru
+ * Ham puanların yanı sıra soru kategori ağırlıklarını, elementer rezonansı
+ * ve deterministik canonical imzayı kullanarak pozitif puanlı hayvanları sıralar.
+ * 
+ * Kural 3 & 4:
+ * - Ham puanı sıfır olan hayvanlara yapay pozitif öncelik puanı veya yüzde verilmez.
+ * - Sıfır puanlı hayvanlar tasarım önerisi sıralamasının dışında tutulur (%0.0, Öncelik: 0).
+ * - Pozitif puanlı hayvanların yüzdeleri yalnızca kendi aralarında hesaplanır ve toplamı %100.0 eder.
+ */
+export function computeTotemPriorityRankings(
+  answersMap: Record<string, string>,
+  rawScores: Record<string, number>
+): import('../../types/test').TotemPriorityItem[] {
+  // 1. Hayvanları ham puanlarına ve ikincil kriterlerine göre değerlendir
+  const scoredItems = Object.keys(TOTEM_ANIMALS).map((animal) => {
+    const rawScore = rawScores[animal] || 0;
+    const meta = TOTEM_ANIMALS[animal];
+    const charProfile = TOTEM_ANIMAL_CHARACTERISTICS[animal] || {
+      canonicalOrder: 9,
+      primaryDomains: [],
+    };
+
+    // Ham puanı 0 olan hayvanlar: Yapay pozitif puan veya yüzde almaz
+    if (rawScore === 0) {
+      return {
+        animal,
+        rawScore: 0,
+        priorityScore: 0,
+        isDesignCandidate: false,
+        meta,
+        charProfile,
+        tieBreakReasonTr:
+          'Ham puan: 0p (Danışan bu hayvana ait hiçbir soru şıkkını seçmemiştir. Yapay pozitif puan verilmez; tasarım önerisi sıralamasının dışındadır.)',
+      };
+    }
+
+    // A) Doğrudan seçildiği soruların önem ağırlıkları toplamı (S_kategori)
+    let categoryWeightSum = 0;
+    const chosenQuestions: number[] = [];
+    for (const q of TOTEM_QUESTIONS) {
+      const selectedOptionId = answersMap ? answersMap[q.id] : undefined;
+      const opt = q.options.find((o) => o.id === selectedOptionId);
+      if (opt && opt.associatedType === animal) {
+        categoryWeightSum += QUESTION_IMPORTANCE_WEIGHTS[q.id] || 1.0;
+        chosenQuestions.push(q.order);
+      }
+    }
+
+    // B) Danışanın tüm cevapları ile hayvanın element/alan rezonansı (S_rezonans)
+    let affinityMatches = 0;
+    for (const q of TOTEM_QUESTIONS) {
+      const selectedOptionId = answersMap ? answersMap[q.id] : undefined;
+      const opt = q.options.find((o) => o.id === selectedOptionId);
+      if (opt && opt.associatedType !== animal) {
+        const otherChar = TOTEM_ANIMAL_CHARACTERISTICS[opt.associatedType];
+        if (otherChar) {
+          const hasOverlap = otherChar.primaryDomains.some((d) =>
+            charProfile.primaryDomains.includes(d)
+          );
+          if (hasOverlap) affinityMatches++;
+        }
+      }
+    }
+
+    // C) Deterministik canonical imza ofseti (S_sig)
+    const signatureOffset = (9 - charProfile.canonicalOrder) * 0.0001;
+
+    // Bileşik Öncelik Puanı:
+    // rawScore baskındır (en az 3.0 puanlık ham farkı korur, ikincil katkılar < 0.60 tır)
+    const secondaryBonus = (0.10 * categoryWeightSum) + (0.02 * affinityMatches) + signatureOffset;
+    const priorityScore = Math.round((rawScore + secondaryBonus) * 10000) / 10000;
+
+    const tieBreakReasonTr = `Ham: ${rawScore}p (Soru #${chosenQuestions.join(', ') || '-'}), Kategori Ağırlığı: +${(0.10 * categoryWeightSum).toFixed(3)}, Element Rezonansı: +${(0.02 * affinityMatches).toFixed(3)}`;
+
+    return {
+      animal,
+      rawScore,
+      priorityScore,
+      isDesignCandidate: true,
+      meta,
+      charProfile,
+      tieBreakReasonTr,
+    };
+  });
+
+  // 2. Pozitif puanlı ve sıfır puanlı hayvanları ayır
+  const positiveItems = scoredItems
+    .filter((item) => item.isDesignCandidate)
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+
+  const zeroItems = scoredItems
+    .filter((item) => !item.isDesignCandidate)
+    .sort((a, b) => a.charProfile.canonicalOrder - b.charProfile.canonicalOrder);
+
+  // 3. Pozitif puanlı hayvanların yüzdelerini YALNIZCA KENDİ ARALARINDA hesapla (toplamı tam %100.0)
+  const positivePriorityScores = positiveItems.map((item) => item.priorityScore);
+  const distinctPercentages = computeDistinctPercentages(positivePriorityScores);
+
+  // 4. Pozitif puanlı adayların tasarım ve mizaç rollerini oluştur
+  const positiveRanked: import('../../types/test').TotemPriorityItem[] = positiveItems.map((item, idx) => {
+    const rank = idx + 1;
+    let role: 'PRIMARY_DESIGN' | 'FIRST_ALTERNATIVE' | 'ALTERNATIVE';
+    let roleLabelTr: string;
+
+    if (rank === 1) {
+      role = 'PRIMARY_DESIGN';
+      roleLabelTr = 'Ana Tasarım Önceliği';
+    } else if (rank === 2) {
+      role = 'FIRST_ALTERNATIVE';
+      roleLabelTr = 'İlk Alternatif';
+    } else {
+      role = 'ALTERNATIVE';
+      roleLabelTr = 'Alternatif';
+    }
+
+    let temperamentRoleTr = 'İkincil Mizaç Eğilimi';
+    if (rank === 1) {
+      temperamentRoleTr = 'Baskın Mizaç Totemi';
+    } else if (rank === 2) {
+      temperamentRoleTr = 'Tamamlayıcı Mizaç Totemi';
+    }
+
+    const pct = distinctPercentages[idx];
+    const percentageFormatted = `%${pct.toFixed(1)}`;
+
+    return {
+      rank,
+      animal: item.animal,
+      rawScore: item.rawScore,
+      priorityScore: item.priorityScore,
+      percentage: pct,
+      percentageFormatted,
+      role,
+      roleLabelTr,
+      temperamentRoleTr,
+      isApprovedForDesign: false,
+      isDesignCandidate: true,
+      elementTr: item.meta.elementTr,
+      coreTraitTr: item.meta.coreTraitTr,
+      symbolicMeaningTr: item.meta.symbolicMeaningTr,
+      tieBreakReasonTr: item.tieBreakReasonTr,
+    };
+  });
+
+  // 5. Sıfır puanlı hayvanları tasarım önerisi dışı olarak ekle (Yapay puan ve yüzde verilmez)
+  const zeroRanked: import('../../types/test').TotemPriorityItem[] = zeroItems.map((item, idx) => {
+    const rank = positiveItems.length + idx + 1;
+    return {
+      rank,
+      animal: item.animal,
+      rawScore: 0,
+      priorityScore: 0,
+      percentage: 0,
+      percentageFormatted: '%0.0',
+      role: 'OUTSIDE_RECOMMENDATION',
+      roleLabelTr: 'Tasarım Önerisi Dışı (0 Puan)',
+      temperamentRoleTr: 'Mizaçta Belirgin Değil (0 Puan)',
+      isApprovedForDesign: false,
+      isDesignCandidate: false,
+      elementTr: item.meta.elementTr,
+      coreTraitTr: item.meta.coreTraitTr,
+      symbolicMeaningTr: item.meta.symbolicMeaningTr,
+      tieBreakReasonTr: item.tieBreakReasonTr,
+    };
+  });
+
+  return [...positiveRanked, ...zeroRanked];
+}
+
+/**
+ * 10 Soruluk Cevap Matrisinden Hayvan Totemini ve Tasarım Öncelik Sıralamasını Hesaplar
+ * Kural 1: Tasarım önceliği ile mizaç analizindeki baskın hayvan ayrı kavramlar olarak ele alınır.
+ * Kural 2: Ana tasarım önceliği, alternatifler ve mizaç yorumları birbirleriyle çelişmez.
+ * Kural 3 & 4: 0 puanlı hayvanlara yapay puan/yüzde verilmez, pozitif puanlıların yüzdeleri toplamı %100 eder.
  * Kural 7: Eksik zorunlu cevap varsa sonuç hesaplanmaz.
- * Kural 18: Görsel tasarıma zorla sokulmaz; analiz-yalnızca niteliği korunur.
+ * Kural 18: Görsel tasarıma zorla sokulmaz; danışan onaysız dövmeye eklenmez.
  */
 export function evaluateTotemTest(
   answersMap: Record<string, string>
@@ -236,27 +556,29 @@ export function evaluateTotemTest(
     }
   }
 
-  // Puanlara göre azalan sırala; puan eşitliğinde deterministik alfabetik kural uygula (A22 Kural 5)
-  const sortedAnimals = Object.entries(scores).sort((a, b) => {
-    if (b[1] !== a[1]) {
-      return b[1] - a[1];
-    }
-    return a[0].localeCompare(b[0], 'tr');
-  });
+  // A62 Deterministik Önceliklendirme ve İkincil Eşleştirme Sıralaması
+  const priorityRankings = computeTotemPriorityRankings(answersMap, scores);
 
-  const primaryTotemName = sortedAnimals[0][0];
+  const primaryTotemName = priorityRankings[0].animal;
   const secondaryTotemName =
-    sortedAnimals[1] && sortedAnimals[1][1] > 0 ? sortedAnimals[1][0] : undefined;
+    priorityRankings[1] && priorityRankings[1].rawScore > 0 ? priorityRankings[1].animal : undefined;
   const primaryMeta = TOTEM_ANIMALS[primaryTotemName];
 
+  const priorityScores: Record<string, number> = {};
+  const percentageScores: Record<string, number> = {};
+  for (const item of priorityRankings) {
+    priorityScores[item.animal] = item.priorityScore;
+    percentageScores[item.animal] = item.percentage;
+  }
+
   const interpretations: string[] = [
-    `Ana Ruh Hayvanı Totemi: ${primaryTotemName} (${primaryMeta?.elementTr || ''} Elementi). ${primaryMeta?.coreTraitTr || ''}`,
-    `İçgüdüsel Rol: ${primaryMeta?.instinctiveRoleTr || ''}`,
-    `Sembolik Derinlik: ${primaryMeta?.symbolicMeaningTr || ''}`,
+    `Mizaç Analizi Boyutu: Baskın Mizaç Totemi: ${primaryTotemName} (${primaryMeta?.elementTr || ''} Elementi - Ham Puan: ${scores[primaryTotemName]}p). ${primaryMeta?.coreTraitTr || ''}`,
+    `İçgüdüsel Rol & Sembolik Anlam: ${primaryMeta?.instinctiveRoleTr || ''} · ${primaryMeta?.symbolicMeaningTr || ''}`,
     secondaryTotemName && TOTEM_ANIMALS[secondaryTotemName]
-      ? `Tamamlayıcı Rehber Totem: ${secondaryTotemName} (${TOTEM_ANIMALS[secondaryTotemName].coreTraitTr})`
-      : 'Tekil odaklı totem rehberliği.',
-    `Tasarım Entegrasyon Notu (Kural 18): Totem hayvanı öncelikli olarak danışanın içgüdüsel mizaç analizi içindir. Dövme tasarımında doğrudan figür olarak değil, ancak danışan onay verirse soyut geometrik çizgilerle entegre edilir.`,
+      ? `Tamamlayıcı Mizaç Totemi: ${secondaryTotemName} (${TOTEM_ANIMALS[secondaryTotemName].coreTraitTr} - Ham Puan: ${scores[secondaryTotemName]}p).`
+      : 'Tamamlayıcı Mizaç Totemi: Bulunmuyor (Tekil odaklı ruh rehberliği).',
+    `Dövme Tasarımı Boyutu: Ana Tasarım Önceliği: ${primaryTotemName} (Tasarım Öncelik Puanı: ${priorityRankings[0].priorityScore.toFixed(4)}, Tasarım Rezonansı: ${priorityRankings[0].percentageFormatted}); ${priorityRankings[1] && priorityRankings[1].rawScore > 0 ? `İlk Alternatif: ${priorityRankings[1].animal} (${priorityRankings[1].percentageFormatted})` : 'İlk Alternatif: Bulunmuyor'}.`,
+    `Tasarım Entegrasyon Notu (Kural 18): Mizaç analizi ile dövme tasarımı iki ayrı boyuttur. Totem hayvanı öncelikli olarak danışanın içgüdüsel mizaç analizi içindir. Dövme tasarımında doğrudan figür olarak değil, ancak danışan onay verirse soyut geometrik çizgilerle entegre edilir. Sıfır puanlı hayvanlar yapay puan almaz ve tasarım önerisi sıralamasının dışındadır.`,
   ];
 
   return {
@@ -264,5 +586,9 @@ export function evaluateTotemTest(
     secondaryType: secondaryTotemName,
     dominantScores: scores,
     interpretations,
+    totemPriorityRankings: priorityRankings,
+    rawScores: scores,
+    priorityScores,
+    percentageScores,
   };
 }

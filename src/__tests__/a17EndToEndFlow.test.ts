@@ -262,19 +262,18 @@ describe('A17: Uçtan Uca Danışan → Analiz → Reçete → Tasarım Akışı
     };
     saveClientDesign(client.id, design1);
 
-    // Versiyon 2 Tasarım
+    // Güncel Tasarım
     const design2 = {
       ...design1,
       id: 'design_v2_test',
-      versionNumber: 2,
+      versionNumber: 1,
       title: 'Versiyon 2 Tasarımı',
     };
     saveClientDesign(client.id, design2);
 
     const storedDesigns = getClientDesigns(client.id);
-    assert.strictEqual(storedDesigns.length, 2, 'İki versiyon birden saklanmalıdır');
-    assert.strictEqual(storedDesigns[0].versionNumber, 1);
-    assert.strictEqual(storedDesigns[1].versionNumber, 2);
+    assert.strictEqual(storedDesigns.length, 1, 'Tekil güncel kayıt ilkesi: yalnızca en güncel tasarım saklanmalıdır');
+    assert.strictEqual(storedDesigns[0].title, 'Versiyon 2 Tasarımı');
 
     // Tasarımlar sıfırlandığında numeroloji analizi silinmemeli
     clearClientDesigns(client.id);

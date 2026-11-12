@@ -29,7 +29,8 @@ import {
   AstroTime,
   e_tilt,
 } from 'astronomy-engine';
-import { ZodiacSign } from '../../types/astrology';
+import { ZodiacSign, TropicalNatalChart } from '../../types/astrology';
+import { Client } from '../../types/client';
 
 export interface AstronomyEngineMetadata {
   libraryName: string;
@@ -504,3 +505,56 @@ export function verifyAstrologyEngineIntegrity(): AstrologyEngineStatusReport {
     };
   }
 }
+
+/**
+ * Danışanın güncel doğum verileri ile kayıtlı Batı Astroloji haritasını karşılaştırır.
+ * Doğum tarihi, saati, saatin bilinirlik durumu veya doğum koordinatları değişmişse
+ * eski harita geçersiz (stale) kabul edilir ve true döner.
+ */
+export function isAstrologyChartStale(
+  chart: TropicalNatalChart | null | undefined,
+  client: Client | null | undefined
+): boolean {
+  if (!chart || !client) return true;
+
+  // 1. Doğum Tarihi Değişimi
+  if ((chart.birthDate || '').trim() !== (client.birthDate || '').trim()) {
+    return true;
+  }
+
+  // 2. Doğum Saati Bilinirlik Durumu
+  const clientTimeUnknown = Boolean(client.isBirthTimeUnknown);
+  const chartTimeUnknown = Boolean(chart.isBirthTimeUnknown);
+  if (clientTimeUnknown !== chartTimeUnknown) {
+    return true;
+  }
+
+  // 3. Bilinen Doğum Saati Karşılaştırması (Eğer haritada saat kayıtlıysa)
+  if (!clientTimeUnknown && chart.birthTime !== undefined && chart.birthTime !== null) {
+    const cTime = (client.birthTime || '').trim();
+    const chTime = (chart.birthTime || '').trim();
+    if (cTime && chTime && cTime !== chTime) {
+      return true;
+    }
+  }
+
+  // 4. Doğum Yeri Koordinatları ve Zaman Dilimi
+  const loc = client.birthLocation;
+  if (!loc || typeof loc.latitude !== 'number' || isNaN(loc.latitude) || typeof loc.longitude !== 'number' || isNaN(loc.longitude)) {
+    return true;
+  }
+
+  // Koordinat toleransı: 0.1 derece (~11 km; harita tıklaması veya yuvarlamalara toleranslı, farklı şehirleri yakalar)
+  const latDiff = Math.abs((chart.latitude ?? NaN) - loc.latitude);
+  const lonDiff = Math.abs((chart.longitude ?? NaN) - loc.longitude);
+  if (isNaN(latDiff) || latDiff > 0.1 || isNaN(lonDiff) || lonDiff > 0.1) {
+    return true;
+  }
+
+  if (loc.timezone && chart.timezone && loc.timezone !== chart.timezone) {
+    return true;
+  }
+
+  return false;
+}
+

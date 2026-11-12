@@ -2,10 +2,10 @@ import { Client } from '../types/client';
 import { ClientArchiveRecord } from '../types/archive';
 import { ChakraName } from '../types/analysis';
 import { TestQuestionAnswer } from '../types/test';
-import { TROPICAL_ZODIAC_SIGNS, CELESTIAL_BODIES_TR } from '../modules/astrology';
+import { TROPICAL_ZODIAC_SIGNS, CELESTIAL_BODIES_TR, isAstrologyChartStale } from '../modules/astrology';
 import { CHAKRA_DEFINITIONS } from '../modules/chakra';
 import { TOTEM_ANIMALS, ENNEAGRAM_QUESTIONS, TOTEM_QUESTIONS } from '../modules/tests';
-import { NUMBER_RESONANCE_TABLE } from '../modules/numerology';
+import { NUMBER_RESONANCE_TABLE, isNumerologyStale } from '../modules/numerology';
 import { ZodiacSign } from '../types/astrology';
 
 /**
@@ -153,18 +153,22 @@ export function getAstrologyCardData(
   const analysis = archive?.analyses.find((a) => a.clientId === clientId);
   const astro = analysis?.astrology;
 
+  const isStale = astro ? isAstrologyChartStale(astro, client) : false;
   const isRecorded = Boolean(
     astro &&
+    !isStale &&
     astro.sunSign &&
     Array.isArray(astro.planetaryPositions) &&
     astro.planetaryPositions.length > 0
   );
 
-  if (!isRecorded || !astro) {
+  if (!isRecorded || !astro || isStale) {
     return {
       hasRecord: false,
       clientId,
-      sourceNoteTr: 'Astroloji analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
+      sourceNoteTr: isStale
+        ? 'Doğum bilgileri değiştiği için astroloji hesaplaması geçersizdir. Lütfen yeniden hesaplayınız.'
+        : 'Astroloji analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
       isBirthTimeKnown: !client.isBirthTimeUnknown,
     };
   }
@@ -190,7 +194,7 @@ export function getAstrologyCardData(
 
   const risingNoteTr = isTimeKnown
     ? (formattedAscTr ? `Yükselen Burç: ${formattedAscTr}` : (ascTr ? `Yükselen Burç: ${ascTr}` : 'Yükselen hesaplanamadı'))
-    : 'Doğum saati bilinmediği için Yükselen burç ve kesin ev yerleşimleri hesaplanamaz. Gezegen konumları için 12:00 öğle referansı varsayımı kullanılmıştır.';
+    : 'Doğum saati bilinmediği için Yükselen burç ve kesin ev yerleşimleri hesaplanamaz. Gezegen konumları için 12:00 öğle referansı varsayımı kullanılmıştır (Yükselen burç sonucu kesin değildir).';
 
   const planets = (astro.planetaryPositions || []).map((p) => {
     const normP = normalizeZodiacKey(p.sign);
@@ -243,13 +247,16 @@ export function getNumerologyCardData(
   const analysis = archive?.analyses.find((a) => a.clientId === clientId);
   const num = analysis?.numerology;
 
-  const isRecorded = Boolean(num && typeof num.lifePathNumber === 'number' && num.destinyNumber);
+  const isStale = num ? isNumerologyStale(num, client) : false;
+  const isRecorded = Boolean(num && !isStale && typeof num.lifePathNumber === 'number' && num.destinyNumber);
 
-  if (!isRecorded || !num) {
+  if (!isRecorded || !num || isStale) {
     return {
       hasRecord: false,
       clientId,
-      sourceNoteTr: 'Numeroloji sonucu henüz kayıtlı değil. Kayıt bulunmuyor.',
+      sourceNoteTr: isStale
+        ? 'Ad, soyad veya doğum tarihi değiştiği için numeroloji hesaplaması geçersizdir. Lütfen yeniden hesaplayınız.'
+        : 'Numeroloji sonucu henüz kayıtlı değil. Kayıt bulunmuyor.',
     };
   }
 
@@ -294,14 +301,24 @@ export function getChakraCardData(
   const clientId = client.id;
   const analysis = archive?.analyses.find((a) => a.clientId === clientId);
   let chakra = analysis?.chakra;
+  const num = analysis?.numerology;
+  const isNumStale = num ? isNumerologyStale(num, client) : true;
 
-  const isRecorded = Boolean(chakra && Array.isArray(chakra.chakras) && chakra.chakras.length > 0);
+  const isRecorded = Boolean(
+    chakra &&
+    num &&
+    !isNumStale &&
+    Array.isArray(chakra.chakras) &&
+    chakra.chakras.length > 0
+  );
 
   if (!isRecorded || !chakra) {
     return {
       hasRecord: false,
       clientId,
-      sourceNoteTr: 'Çakra analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
+      sourceNoteTr: isNumStale && num
+        ? 'Bağlı numeroloji analizi geçersiz olduğu için çakra analizi güncellenmelidir.'
+        : 'Çakra analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
     };
   }
 
@@ -417,9 +434,13 @@ export function getArchetypeCardData(
   const clientId = client.id;
   const analysis = archive?.analyses.find((a) => a.clientId === clientId);
   const archetype = analysis?.archetype;
+  const num = analysis?.numerology;
+  const isNumStale = num ? isNumerologyStale(num, client) : true;
 
   const isRecorded = Boolean(
     archetype &&
+    num &&
+    !isNumStale &&
     archetype.unifiedArchetype &&
     archetype.unifiedArchetype.primary &&
     archetype.shadowArchetype
@@ -429,7 +450,9 @@ export function getArchetypeCardData(
     return {
       hasRecord: false,
       clientId,
-      sourceNoteTr: 'Arketip analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
+      sourceNoteTr: isNumStale && num
+        ? 'Bağlı numeroloji analizi geçersiz olduğu için arketip analizi güncellenmelidir.'
+        : 'Arketip analizi henüz kayıtlı değil. Kayıt bulunmuyor.',
     };
   }
 
@@ -559,7 +582,7 @@ export function formatAstrologyCopyText(
     `Ay Burcu: ${data.moonSignTr || '-'}`,
     data.isBirthTimeKnown && data.ascendantSignTr
       ? `Yükselen Burç: ${data.formattedAscendantTr || data.ascendantSignTr}`
-      : `Yükselen Burç: Doğum saati bilinmediği için hesaplanamaz`,
+      : `Yükselen Burç: Doğum saati bilinmediği için hesaplanamaz (12:00 varsayımı kullanılmıştır; kesin değildir)`,
     ``,
     `Gezegen Konumları (Boylam & Ev):`,
   ];

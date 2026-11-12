@@ -3,7 +3,7 @@ import { ClientFormData } from '../../types/client';
 import { GlobalLocation } from '../../types/location';
 import { GlobalLocationPicker } from '../map/GlobalLocationPicker';
 import { useApp } from '../../store/AppContext';
-import { X, UserPlus, User, Mail, Phone, Calendar, Clock, FileText } from 'lucide-react';
+import { X, UserPlus, User, Mail, Phone, Calendar, Clock, FileText, AlertTriangle } from 'lucide-react';
 
 const INITIAL_LOCATION: GlobalLocation = {
   country: 'Türkiye',
@@ -40,6 +40,7 @@ export const NewClientModal: React.FC<NewClientModalProps> = ({ isOpen, onClose 
   const { createClientManual } = useApp();
   const [formData, setFormData] = useState<ClientFormData>(DEFAULT_FORM_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -59,15 +60,41 @@ export const NewClientModal: React.FC<NewClientModalProps> = ({ isOpen, onClose 
     e.preventDefault();
     setIsSubmitting(true);
     setErrors({});
+    setStorageWarning(null);
 
     const result = await createClientManual(formData);
     setIsSubmitting(false);
 
     if (result.success) {
-      setFormData(DEFAULT_FORM_DATA);
-      onClose();
-    } else if (result.errors) {
-      setErrors(result.errors);
+      if (result.storageStatus === 'persisted') {
+        setFormData(DEFAULT_FORM_DATA);
+        setStorageWarning(null);
+        onClose();
+      } else if (result.storageStatus === 'memory_only') {
+        setStorageWarning(
+          result.warning ||
+            'Danışan kaydı tarayıcı oturum belleğine alındı (kalıcı depolama yazılamadı). Tarayıcı yenilendiğinde bu danışan kaybolabilir.'
+        );
+      } else if (result.storageStatus === 'partial_failure') {
+        setStorageWarning(
+          result.warning ||
+            'Danışan kaydedildi ancak bazı veriler kalıcı depolamaya yazılamadı.'
+        );
+      } else {
+        setFormData(DEFAULT_FORM_DATA);
+        setStorageWarning(null);
+        onClose();
+      }
+    } else {
+      if (result.errors) {
+        setErrors(result.errors);
+      } else {
+        setErrors({
+          form:
+            (result as any).error ||
+            'Danışan kaydı depolanamadı. Kalıcı ve geçici depolama başarısız oldu.',
+        });
+      }
     }
   };
 
@@ -91,6 +118,31 @@ export const NewClientModal: React.FC<NewClientModalProps> = ({ isOpen, onClose 
 
         {/* Form Alanı */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[78vh] overflow-y-auto">
+          {storageWarning && (
+            <div className="p-3.5 text-xs bg-amber-950/60 border border-amber-600/70 text-amber-200 rounded-xl space-y-2.5 animate-in fade-in">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-amber-300">Geçici Bellek Uyarısı</p>
+                  <p className="text-amber-200/90 leading-relaxed">{storageWarning}</p>
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(DEFAULT_FORM_DATA);
+                    setStorageWarning(null);
+                    onClose();
+                  }}
+                  className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Anladım, Çalışma Alanına Geç
+                </button>
+              </div>
+            </div>
+          )}
+
           {errors.form && (
             <div className="p-3 text-xs bg-rose-950/50 border border-rose-800 text-rose-300 rounded-lg">
               {errors.form}

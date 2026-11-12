@@ -22,4 +22,8 @@ export interface TestEvaluationResult {
   secondaryType?: string;
   dominantScores: Record<string, number>;
   interpretations: string[];
+  totemPriorityRankings?: import('../../types/test').TotemPriorityItem[];
+  rawScores?: Record<string, number>;
+  priorityScores?: Record<string, number>;
+  percentageScores?: Record<string, number>;
 }

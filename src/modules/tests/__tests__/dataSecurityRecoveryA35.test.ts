@@ -268,21 +268,26 @@ describe('A35 — Üretim Öncesi Veri Güvenliği ve Geri Kazanım İnşası Te
     assert.equal(fetchedB?.notes, 'Özel danışan B');
   });
 
-  test('8. Tasarım sürüm arşiv koruması: Yeni sürüm eklendiğinde eski sürüm silinmez ve korunur', () => {
+  test('8. Tekil güncel tasarım kaydı: Yeni sürüm eklendiğinde eski sürüm silinir ve tekil güncel kayıt kalır', () => {
     const client = createClientRecord(mockFormDataA, 'OWNER_MANUAL');
 
     const designV1 = createTestMockDesign(client.id, 1, 'Tasarım V1', 'design_v1');
     saveClientDesign(client.id, designV1);
 
-    const designV2 = createTestMockDesign(client.id, 2, 'Tasarım V2', 'design_v2');
+    const designV2 = {
+      ...createTestMockDesign(client.id, 1, 'Tasarım V2', 'design_v2'),
+      recipe: {
+        ...createTestMockDesign(client.id, 1, 'Tasarım V2', 'design_v2').recipe,
+        primarySymbol: 'Metatron Küpü',
+      },
+    };
     saveClientDesign(client.id, designV2);
 
     const designs = getClientDesigns(client.id);
-    assert.equal(designs.length, 2);
+    assert.equal(designs.length, 1, 'Tekil güncel kayıt ilkesi: yalnızca 1 tasarım kalmalıdır');
     assert.equal(designs[0].versionNumber, 1);
-    assert.equal(designs[0].recipe?.primarySymbol, 'Lotus');
-    assert.equal(designs[1].versionNumber, 2);
-    assert.equal(designs[1].recipe?.primarySymbol, 'Metatron Küpü');
+    assert.equal(designs[0].title, 'Tasarım V2');
+    assert.equal(designs[0].recipe?.primarySymbol, 'Metatron Küpü');
   });
 
   test('9. Dövme tasarımı kaydederken başka danışanın ID si ile çakışma durumunda otomatik ID atanması', () => {

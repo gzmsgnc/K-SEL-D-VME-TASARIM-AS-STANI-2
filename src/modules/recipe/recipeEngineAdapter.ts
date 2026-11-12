@@ -44,8 +44,8 @@ export function prepareRecipeModule(
   const hasEnneagram = clientTests.some((t) => t.testType === 'ENNEAGRAM' && Boolean(t.primaryType));
   const hasTotem = clientTests.some((t) => t.testType === 'ANIMAL_TOTEM' && Boolean(t.primaryType));
 
-  const existingDesigns = isArchiveForClient ? archive.designs.filter((d) => d.clientId === clientId) : [];
-  const existingDesignCount = existingDesigns.length;
+  const existingDesigns = isArchiveForClient && archive.designs ? archive.designs.filter((d) => d.clientId === clientId) : [];
+  const existingDesignCount = existingDesigns.length > 0 ? 1 : 0;
 
   const warningNotices: string[] = [];
 
@@ -72,7 +72,7 @@ export function prepareRecipeModule(
     statusMessageTr = 'Dövme reçetesi için zorunlu modül çıktıları (Numeroloji, Çakra ve Arketip) henüz eksiksiz değil.';
   } else if (existingDesignCount > 0) {
     status = 'COMPLETED';
-    statusMessageTr = `Bu danışan için ${existingDesignCount} adet kayıtlı dövme reçetesi/tasarımı mevcuttur. Yeni versiyon eklenebilir.`;
+    statusMessageTr = 'Bu danışan için kayıtlı bir dövme reçetesi/tasarımı mevcuttur. Yeni tasarım ile güncellenebilir.';
   } else {
     status = 'READY_TO_RUN';
     statusMessageTr = 'Tüm zorunlu analiz çıktıları hazır. Kişiye özel dövme reçetesi üretilmeye hazırdır.';
@@ -137,8 +137,6 @@ export function generateClientRecipe(
   }
 
   const clientTests = archive.testResults.filter((t) => t.clientId === clientId);
-  const existingDesigns = archive.designs.filter((d) => d.clientId === clientId);
-  const nextVersionNumber = existingDesigns.length + 1;
 
   try {
     const design = generateTattooRecipeFromAnalyses({
@@ -149,7 +147,7 @@ export function generateClientRecipe(
       archetype,
       testResults: clientTests,
       options,
-      nextVersionNumber,
+      nextVersionNumber: 1, // Tekil güncel kayıt ilkesi: versiyon biriktirme sonlandırıldı, sabit aktif sürüm 1
     });
 
     return {

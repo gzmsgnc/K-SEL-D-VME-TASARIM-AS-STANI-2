@@ -3,7 +3,7 @@ import { ClientFormData } from '../../types/client';
 import { GlobalLocation } from '../../types/location';
 import { GlobalLocationPicker } from '../map/GlobalLocationPicker';
 import { useApp } from '../../store/AppContext';
-import { CheckCircle2, User, Mail, Phone, Calendar, Clock, Sparkles, FileText, Send } from 'lucide-react';
+import { CheckCircle2, User, Mail, Phone, Calendar, Clock, Sparkles, FileText, Send, ArrowRight, AlertTriangle } from 'lucide-react';
 
 const INITIAL_LOCATION: GlobalLocation = {
   country: 'Türkiye',
@@ -32,11 +32,12 @@ const DEFAULT_FORM_STATE: ClientFormData = {
 };
 
 export const ClientIntakeForm: React.FC = () => {
-  const { submitClientForm } = useApp();
+  const { submitClientForm, setMode } = useApp();
   const [formData, setFormData] = useState<ClientFormData>(DEFAULT_FORM_STATE);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   const handleChange = (field: keyof ClientFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -53,11 +54,17 @@ export const ClientIntakeForm: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrors({});
+    setStorageWarning(null);
 
     const result = await submitClientForm(formData);
     setIsSubmitting(false);
 
     if (result.success) {
+      if (result.storageStatus === 'memory_only' || result.warning) {
+        setStorageWarning(result.warning || 'Danışan kaydı alındı ancak yalnızca oturum belleğine yazıldı (sayfa yenilenirse kaybolabilir).');
+      } else {
+        setStorageWarning(null);
+      }
       setIsSubmitted(true);
     } else if (result.errors) {
       setErrors(result.errors);
@@ -73,6 +80,7 @@ export const ClientIntakeForm: React.FC = () => {
   const handleResetForm = () => {
     setFormData(DEFAULT_FORM_STATE);
     setErrors({});
+    setStorageWarning(null);
     setIsSubmitted(false);
   };
 
@@ -94,6 +102,13 @@ export const ClientIntakeForm: React.FC = () => {
             </p>
           </div>
 
+          {storageWarning && (
+            <div className="p-3.5 bg-amber-950/40 border border-amber-800/80 rounded-xl text-xs text-amber-300 flex items-start gap-2.5 max-w-md mx-auto text-left">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>{storageWarning}</span>
+            </div>
+          )}
+
           <div className="p-4 bg-stone-950/60 border border-stone-800/80 rounded-xl text-left text-xs space-y-1.5 max-w-md mx-auto text-stone-400">
             <div className="flex justify-between">
               <span className="text-stone-500">Danışan:</span>
@@ -109,11 +124,19 @@ export const ClientIntakeForm: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMode('OWNER_WORKSPACE')}
+              className="w-full sm:w-auto px-6 py-3 text-xs font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-950/40"
+            >
+              <span>Devam Et: Danışan Çalışma Alanına Geç</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
             <button
               type="button"
               onClick={handleResetForm}
-              className="px-6 py-2.5 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-5 py-3 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
             >
               Yeni Bir Form Gönder
             </button>

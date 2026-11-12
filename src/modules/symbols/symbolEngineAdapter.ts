@@ -71,7 +71,7 @@ export function prepareSymbolModule(
     statusMessageTr = 'Sembol analizi ve seçimi için temel analizlerin (Numeroloji, Çakra, Arketip) tamamlanması gereklidir.';
   } else if (existingAnalysesCount > 0) {
     status = 'COMPLETED';
-    statusMessageTr = `Bu danışan için ${existingAnalysesCount} adet kayıtlı sembol analizi mevcuttur.`;
+    statusMessageTr = 'Bu danışan için 1 adet güncel sembol analizi mevcuttur.';
   } else {
     status = 'READY_TO_RUN';
     statusMessageTr = 'Analiz verileri hazır. Kutsal geometri ve kadim sembol kütüphanesinden seçim yapılabilir.';
@@ -128,8 +128,8 @@ export function buildClientSymbolAnalysis(
     throw new Error('Geçerli bir danışan kaydı gereklidir.');
   }
 
-  const clientAnalyses = archive?.symbolAnalyses.filter((s) => s.clientId === client.id) || [];
-  const nextVersion = clientAnalyses.length + 1;
+  // Her danışan için tek bir güncel ve geçerli sembol analizi tutulur (version: 1)
+  const currentVersion = 1;
 
   // Kural 5: Anne adını içeren sembol seçimi varsa filtrele
   const sanitizedSelected = selectedSymbols.filter((s) => {
@@ -146,7 +146,7 @@ export function buildClientSymbolAnalysis(
   return {
     id: generateId('symbol'),
     clientId: client.id,
-    version: nextVersion,
+    version: currentVersion,
     selectedSymbols: sanitizedSelected,
     compositionNarrative:
       compositionNarrative ||

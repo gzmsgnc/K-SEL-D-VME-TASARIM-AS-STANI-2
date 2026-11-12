@@ -41,6 +41,7 @@ import {
   Archive,
   History,
   ArrowRight,
+  ArrowLeft,
   Trash2,
   Copy,
   Check,
@@ -98,7 +99,7 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
   const [showClearDesignsConfirm, setShowClearDesignsConfirm] = useState<boolean>(false);
 
   // Geri Bildirim ve Yüklenme Durumları
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState<boolean>(false);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState<boolean>(false);
 
@@ -156,15 +157,10 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
 
   const activeDesign: ClientTattooDesign | null = useMemo(() => {
     if (!clientDesigns.length) return null;
-    if (selectedDesignVersionId) {
-      return clientDesigns.find((d) => d.id === selectedDesignVersionId) || latestDesign;
-    }
     return latestDesign;
-  }, [clientDesigns, selectedDesignVersionId, latestDesign]);
+  }, [clientDesigns, latestDesign]);
 
-  const isViewingHistoricalVersion = Boolean(
-    activeDesign && latestDesign && activeDesign.id !== latestDesign.id
-  );
+  const isViewingHistoricalVersion = false;
 
   // A34: 9 Durumlu Tasarım Aşaması Tespiti
   const designStage = useMemo(() => {
@@ -365,10 +361,17 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
       }
 
       setSelectedDesignVersionId(result.design.id);
-      setFeedback({
-        type: 'success',
-        message: `Tebrikler! ${result.design.title} (V${result.design.versionNumber}) başarıyla üretildi ve arşive kaydedildi.`,
-      });
+      if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+        setFeedback({
+          type: 'warning',
+          message: `${result.design.title} (V${result.design.versionNumber}) üretildi ancak veriler yalnızca oturum belleğinde saklandı (sayfa yenilenirse kaybolabilir).`,
+        });
+      } else {
+        setFeedback({
+          type: 'success',
+          message: `Tebrikler! ${result.design.title} (V${result.design.versionNumber}) başarıyla üretildi ve arşive kaydedildi.`,
+        });
+      }
       setCurrentStep(4); // Reçeteyi İncele adımına ilerle
     } catch (err: any) {
       setFeedback({
@@ -442,10 +445,17 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
 
       const saveRes = saveClientDesign(client.id, updatedDesign);
       if (saveRes.success) {
-        setFeedback({
-          type: 'success',
-          message: `Görsel İstem (Midjourney / AI Prompt) V${updatedDesign.versionNumber} için başarıyla sentezlendi!`,
-        });
+        if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+          setFeedback({
+            type: 'warning',
+            message: `Görsel İstem V${updatedDesign.versionNumber} için üretildi ancak veriler yalnızca oturum belleğinde saklandı.`,
+          });
+        } else {
+          setFeedback({
+            type: 'success',
+            message: `Görsel İstem (Midjourney / AI Prompt) V${updatedDesign.versionNumber} için başarıyla sentezlendi!`,
+          });
+        }
         setCurrentStep(6); // Kopyala / Arşivle adımına ilerle
       } else {
         setFeedback({
@@ -718,8 +728,8 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
                 {recipePrep.hasAstrology ? '✓ Harita Dahil' : '○ İsteğe Bağlı'}
               </span>
               <span className="text-[10px] text-stone-400 block truncate">
-                {storedAnalysis?.astrology?.sunSign
-                  ? `Güneş: ${storedAnalysis.astrology.sunSign}`
+                {storedAnalysis?.astrology?.moonSign
+                  ? `Ay: ${storedAnalysis.astrology.moonSign}${storedAnalysis.astrology.ascendantSign ? ` | ASC: ${storedAnalysis.astrology.ascendantSign}` : ''}`
                   : (storedAnalysis?.astrology ? 'Harita Kayıtlı' : 'Kayıt bulunmuyor')}
               </span>
             </div>
@@ -781,6 +791,8 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
             className={`p-3 rounded-lg text-xs flex items-start justify-between gap-2 ${
               feedback.type === 'error'
                 ? 'bg-rose-950/40 border border-rose-900/60 text-rose-300'
+                : feedback.type === 'warning'
+                ? 'bg-amber-950/40 border border-amber-900/60 text-amber-300'
                 : feedback.type === 'info'
                 ? 'bg-blue-950/40 border border-blue-900/60 text-blue-300'
                 : 'bg-emerald-950/40 border border-emerald-900/60 text-emerald-300'
@@ -789,6 +801,8 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
             <div className="flex items-center gap-2">
               {feedback.type === 'error' ? (
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              ) : feedback.type === 'warning' ? (
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
               ) : (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               )}
@@ -1313,7 +1327,7 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
                 A15 Dövme Reçetesi Motorunu Çağır
               </span>
               <span className="text-[11px] text-stone-400 block">
-                Üretilen reçete V{clientDesigns.length + 1} olarak arşivlenecektir. Önceki sürümler silinmez.
+                Üretilen reçete danışanın tekil güncel tasarımı olarak kaydedilir.
               </span>
             </div>
 
@@ -1347,7 +1361,7 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Reçete Oluştur (V{clientDesigns.length + 1})</span>
+                    <span>Reçete Oluştur</span>
                   </>
                 )}
               </button>
@@ -1785,55 +1799,69 @@ export const ClientTattooDesignWorkflow: React.FC<ClientTattooDesignWorkflowProp
                 </div>
               </div>
 
-              {/* SÜRÜM YÖNETİMİ & ARŞİV (Section 8) */}
-              <div className="p-4 bg-stone-950/80 border border-stone-800 rounded-xl space-y-3">
+              {/* TEKİL GÜNCEL TASARIM KAYDI BİLGİSİ (Section 8) */}
+              <div className="p-4 bg-stone-950/80 border border-stone-800 rounded-xl space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-amber-400" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span className="text-xs font-semibold text-stone-200">
-                      Tasarım Sürümleri ({clientDesigns.length} Kayıt)
+                      Tekil Güncel Tasarım Kaydı
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 overflow-x-auto">
-                    {clientDesigns.map((d) => {
-                      const isLatest = d.id === latestDesign?.id;
-                      const isSelected = d.id === activeDesign.id;
-                      return (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => setSelectedDesignVersionId(d.id)}
-                          className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1 ${
-                            isSelected
-                              ? 'bg-amber-500 text-stone-950 font-bold'
-                              : 'bg-stone-900 text-stone-300 border border-stone-800 hover:text-stone-100'
-                          }`}
-                        >
-                          <span>V{d.versionNumber}</span>
-                          <span className="text-[10px] opacity-75">
-                            {isLatest ? '(Güncel)' : '(Arşiv)'}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-emerald-950/80 border border-emerald-800 text-emerald-300 flex items-center gap-1">
+                      <span>Güncel Kayıt</span>
+                      <span className="text-[10px] text-emerald-400/80">(V{activeDesign.versionNumber})</span>
+                    </span>
                   </div>
                 </div>
+                <p className="text-[11px] text-stone-400">
+                  Her danışan için yalnızca bir güncel ve geçerli tasarım kaydı tutulur. Yeni tasarım üretildiğinde önceki kayıt otomatik olarak yenilenir.
+                </p>
+              </div>
 
-                {isViewingHistoricalVersion && latestDesign && (
-                  <div className="p-3 bg-amber-950/40 border border-amber-600/50 rounded-lg flex items-center justify-between gap-2 text-xs">
-                    <span className="text-amber-300">
-                      Geçmiş V{activeDesign.versionNumber} sürümünü görüntülüyorsunuz.
-                    </span>
+              {/* AŞAMA 6 SONU: NİHAİ TAMAMLAMA & NAVİGASYON BARI */}
+              <div className="mt-4 p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-3 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setSelectedDesignVersionId(latestDesign.id)}
-                      className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded text-[11px] cursor-pointer"
+                      onClick={() => setCurrentStep(5)}
+                      className="px-4 py-2.5 rounded-xl border border-stone-700/80 bg-stone-900/90 hover:bg-stone-800 text-stone-300 hover:text-stone-100 font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
                     >
-                      Güncel Sürüme Dön (V{latestDesign.versionNumber})
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Geri: Adım 5 (İstem)</span>
+                    </button>
+                    <div className="hidden md:block">
+                      <span className="text-xs font-semibold text-stone-200 block">
+                        Tasarım Üretim Akışı Tamamlandı
+                      </span>
+                      <span className="text-[11px] text-stone-400 block">
+                        Reçete ve istemler arşivlendi. Sonuç paneline geçebilir veya süreci tamamlayabilirsiniz.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('RESULTS_PANEL')}
+                      className="px-4 py-2.5 rounded-xl border border-amber-600/40 bg-amber-950/30 hover:bg-amber-950/60 text-amber-300 font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Kayıtlı Sonuç Paneli</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('RESULTS_PANEL')}
+                      className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-stone-950 shadow-md shadow-emerald-950/30"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Sonuç Paneline Geç & Tamamla</span>
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}

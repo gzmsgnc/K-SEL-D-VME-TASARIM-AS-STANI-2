@@ -10,6 +10,10 @@ export {
   TOTEM_ANIMALS,
   TOTEM_QUESTIONS,
   evaluateTotemTest,
+  computeTotemPriorityRankings,
+  computeDistinctPercentages,
+  QUESTION_IMPORTANCE_WEIGHTS,
+  TOTEM_ANIMAL_CHARACTERISTICS,
   type TotemAnimalMeta,
 } from '../modules/tests/totemData';
 

@@ -160,5 +160,11 @@ export function runAndBuildTotemResult(
     secondaryType: evaluation.secondaryType,
     dominantScores: evaluation.dominantScores,
     interpretations: evaluation.interpretations,
+    totemPriorityRankings: evaluation.totemPriorityRankings,
+    rawScores: evaluation.rawScores,
+    priorityScores: evaluation.priorityScores,
+    percentageScores: evaluation.percentageScores,
+    selectedTotemAnimal: undefined,
+    rejectedTotemAnimals: [],
   };
 }

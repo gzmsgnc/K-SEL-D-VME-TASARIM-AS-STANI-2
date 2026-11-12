@@ -206,16 +206,40 @@ export function recommendSymbolsForClient(
     }
   }
 
-  // 4. Astroloji Rezonansı (Güneş & Ay Burç Elementleri)
+  // 4. Astroloji Rezonansı (Batı Tropikal: Güneş, Ay ve Yükselen Burçları Bağımsız Olarak Değerlendirilir)
   if (astrology) {
-    if (astrology.sunSign || astrology.moonSign) {
-      addScore('sun-glyph-corona', 16, 'Astrolojik Güneş hizalanması', 'ASTROLOGY');
-      addScore('moon-phases-crescent', 16, 'Astrolojik Ay fazı hizalanması', 'ASTROLOGY');
+    // 4.1 Güneş Burcu (Kozmik Öz, Yaşam Enerjisi & İrade Merkezi)
+    if (astrology.sunSign) {
+      addScore(
+        'sun-glyph-corona',
+        18,
+        `Güneş Burcu (${astrology.sunSign}) - Yaşam gücü, irade ve güneş korona rezonansı`,
+        'ASTROLOGY'
+      );
+    }
+
+    // 4.2 Ay Burcu (Duygusal Derinlik, Sezgi & Bilinçdışı)
+    if (astrology.moonSign) {
+      addScore(
+        'moon-phases-crescent',
+        16,
+        `Ay Burcu (${astrology.moonSign}) - Duygusal akış ve hilal fazı hizalanması`,
+        'ASTROLOGY'
+      );
+    }
+
+    // 4.3 Yükselen Burç (Doğu Ufku & Dünyevi Yönelim Pusulası)
+    if (astrology.ascendantSign) {
+      const ascReason = astrology.isBirthTimeUnknown
+        ? `Astrolojik Yükselen Burç (${astrology.ascendantSign}) [12:00 Öğle Varsayımı - Kesin Değil]`
+        : `Astrolojik Yükselen Burç (${astrology.ascendantSign}) - Doğu ufku pusulası`;
+      addScore('polaris-compass', 16, ascReason, 'ASTROLOGY');
     }
   }
 
   // 5. Hayvan Totemi Değerlendirmesi (Kural 6, 7 & 10)
   // Kural 10: Doğrudan hayvan figürü ana sembol yapılmaz; eğer görselde istenmişse soyut doğal semboller desteklenir
+  // Tür ve element temelli, sembollerin gerçek anlamlarıyla uyumlu soyut geometrik eşleştirme uygulanır
   const totemTest = testResults.find((t) => t.testType === 'ANIMAL_TOTEM');
   if (totemTest && totemTest.primaryType) {
     const totemName = totemTest.primaryType;
@@ -225,12 +249,55 @@ export function recommendSymbolsForClient(
         exc.toLocaleLowerCase('tr-TR').includes(totemName.toLocaleLowerCase('tr-TR'))
     );
     if (options.includeTotemInVisual && !isTotemExcluded) {
-      addScore('obsidian-mountain-peak', 15, `Totem (${totemName}) için soyut yeryüzü topraklanması`, 'TOTEM');
+      const lowerTotem = totemName.toLocaleLowerCase('tr-TR');
+      if (lowerTotem.includes('yunus')) {
+        // Su elementi: Akışkan su dalgaları
+        addScore('flowing-water-waves', 15, `Totem (${totemName}) için Su elementi ve akışkan dalga geometrisi`, 'TOTEM');
+      } else if (lowerTotem.includes('şahin') || lowerTotem.includes('sahin') || lowerTotem.includes('kartal')) {
+        // Hava elementi: Göksel bulut ve hava vektörleri
+        addScore('celestial-cloud-vectors', 15, `Totem (${totemName}) için Hava elementi ve göksel vektör geometrisi`, 'TOTEM');
+      } else if (lowerTotem.includes('baykuş') || lowerTotem.includes('baykus')) {
+        // Gece içgörüsü ve vizyon: Horus Gözü glifi
+        addScore('eye-of-horus', 15, `Totem (${totemName}) için gece vizyonu ve berrak algı glifi`, 'TOTEM');
+      } else if (lowerTotem.includes('jaguar')) {
+        // Ateş ve simyasal dönüşüm: Dört Element Simyası
+        addScore('alchemy-four-elements', 15, `Totem (${totemName}) için Ateş elementi ve simyasal güç geometrisi`, 'TOTEM');
+      } else if (lowerTotem.includes('ayı') || lowerTotem.includes('ayi')) {
+        // Toprak elementi: Yaşam Ağacı
+        addScore('tree-of-life-yggdrasil', 15, `Totem (${totemName}) için Toprak elementi ve kök yaşam ağacı`, 'TOTEM');
+      } else if (lowerTotem.includes('yılan') || lowerTotem.includes('yilan')) {
+        // Dönüşüm ve kabuk değiştirme: Uroboros sonsuzluk glifi
+        addScore('uroboros-infinity', 15, `Totem (${totemName}) için döngüsel yenilenme ve sonsuz dönüşüm glifi`, 'TOTEM');
+      } else if (lowerTotem.includes('kurt')) {
+        // Toprak / Ay zirvesi: Obsidyen Dağ Zirvesi
+        addScore('obsidian-mountain-peak', 15, `Totem (${totemName}) için Toprak/Ay ve sarsılmaz dağ zirvesi`, 'TOTEM');
+      } else if (lowerTotem.includes('geyik')) {
+        // Orman zarafeti ve kalp açıklığı: Kutsal Lotus
+        addScore('sacred-lotus-anahata', 15, `Totem (${totemName}) için orman zarafeti ve saf kalp geometrisi`, 'TOTEM');
+      } else {
+        // Genel soyut yeryüzü topraklanması
+        addScore('obsidian-mountain-peak', 15, `Totem (${totemName}) için soyut yeryüzü topraklanması`, 'TOTEM');
+      }
     }
   }
 
+  // 6. Enneagram Mizaç Analizi Değerlendirmesi:
+  // Enneagram psikolojik bir kişilik ve mizaç tipolojisidir. Mevcut 26 adet kutsal geometri
+  // ve kadim glif ile Enneagram tipleri arasında kanıtlanabilir, objektif bir geometrik
+  // rezonans eşleştirmesi bulunmadığından; rastgele veya temelsiz puanlar üretilmez.
+  // Enneagram sonuçları sembol puanlamasına YAPAY OLARAK DAHİL EDİLMEZ, yalnızca
+  // kavramsal manifesto notlarında yorumlanır.
+
   // Puanlanmış sembolleri filtrele ve sırala
-  const sortedIds = Array.from(scoredIds.entries()).sort((a, b) => b[1].score - a[1].score);
+  // Birincil Kriter: Yüksek puan önce gelir (score DESC)
+  // İkincil Kriter: Eşit puan durumunda sembol kimliği alfabetik sıralanır (id ASC)
+  const sortedIds = Array.from(scoredIds.entries()).sort((a, b) => {
+    const scoreDiff = b[1].score - a[1].score;
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    return a[0].localeCompare(b[0]);
+  });
 
   for (const [id, meta] of sortedIds) {
     const sym = MASTER_SYMBOLS[id];

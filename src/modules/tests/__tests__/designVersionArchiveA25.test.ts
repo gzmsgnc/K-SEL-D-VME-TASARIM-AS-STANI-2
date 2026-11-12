@@ -11,7 +11,7 @@ import {
 import { ClientTattooDesign } from '../../../types/design';
 import { Client } from '../../../types/client';
 
-describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testleri', () => {
+describe('A25: Danışan Dövme Tasarımı Tekil Güncel Kayıt Doğrulama Testleri', () => {
   function createSampleClient(suffix: string): Client {
     return createClientRecord(
       {
@@ -32,7 +32,7 @@ describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testle
           utcOffsetMinutes: 180,
         },
         motherName: 'Sevgi',
-        notes: 'A25 Sürüm Yönetim Testi',
+        notes: 'A25 Tekil Güncel Kayıt Testi',
       },
       'OWNER_MANUAL'
     );
@@ -44,7 +44,7 @@ describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testle
       clientId,
       versionNumber,
       title,
-      conceptStatement: `Versiyon ${versionNumber} konsept manifestosu.`,
+      conceptStatement: `Tasarım ${title} konsept manifestosu.`,
       recipe: {
         style: versionNumber === 1 ? 'FINE_LINE' : 'SACRED_GEOMETRY',
         recommendedPlacement: versionNumber === 1 ? 'FOREARM_INNER' : 'SPINE_CENTER',
@@ -52,14 +52,14 @@ describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testle
         recommendedDimensionsCm: { width: 10 + versionNumber, height: 15 + versionNumber },
         colorProfile: 'MONOCHROME_BLACK',
         colorRationale: 'Siyah mürekkep derinliği.',
-        primarySymbol: versionNumber === 1 ? 'Lotus' : 'Metatron Küpü',
+        primarySymbol: versionNumber === 1 ? 'Lotus' : (versionNumber === 2 ? 'Metatron Küpü' : 'Gölge Şahin'),
         secondarySymbols: ['Ay Fazları', 'Spiral'],
         keyComponents: ['Ana Geometri', 'Hassas Çizgiler'],
         technicalAdviceForArtist: ['3RL iğne grubu', 'Sabit el açısı'],
       },
       aiPrompt: {
-        primaryPromptEn: `Tattoo design version ${versionNumber}, minimalist sacred geometry`,
-        conceptPromptTr: `Türkçe konsept özeti sürüm ${versionNumber}`,
+        primaryPromptEn: `Tattoo design ${title}, minimalist sacred geometry`,
+        conceptPromptTr: `Türkçe konsept özeti: ${title}`,
         negativePrompt: 'blurry, ugly, watermark, text',
         aspectRatio: '3:4',
         artisticModifiers: ['fineline', 'vector art'],
@@ -69,127 +69,167 @@ describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testle
     };
   }
 
-  // 1. Yeni Tasarım Sürümlerinin Bağımsız Olarak Saklanması (V1, V2, V3)
-  it('1. Her yeni tasarım sürümü önceki sürümleri silmeden V1, V2 olarak arşivlenmelidir', () => {
-    const client = createSampleClient('MultiVer');
+  // 1. Aynı danışan için ilk tasarım kaydedildiğinde bir kayıt oluşur
+  it('1. Aynı danışan için ilk tasarım kaydedildiğinde tam bir güncel kayıt oluşmalıdır', () => {
+    const client = createSampleClient('Single1');
 
     try {
       const v1 = createMockDesign(client.id, 1, 'Lotus Çiçeği Kompozisyonu');
-      const v2 = createMockDesign(client.id, 2, 'Kutsal Metatron Geometrisi');
-      const v3 = createMockDesign(client.id, 3, 'Gölge Şahin ve Fraktal Hatlar');
+      saveClientDesign(client.id, v1);
+
+      const designs = getClientDesigns(client.id);
+      assert.strictEqual(designs.length, 1, 'İlk tasarım kaydedildiğinde tam 1 kayıt bulunmalıdır');
+      assert.strictEqual(designs[0].clientId, client.id);
+      assert.strictEqual(designs[0].title, 'Lotus Çiçeği Kompozisyonu');
+      assert.strictEqual(designs[0].recipe.primarySymbol, 'Lotus');
+    } finally {
+      deleteClientRecord(client.id);
+    }
+  });
+
+  // 2. & 3. Aynı danışana ikinci tasarım kaydedildiğinde ilk kayıt tamamen silinir, toplam kayıt sayısı yine birdir
+  it('2. ve 3. Aynı danışana ikinci tasarım kaydedildiğinde ilk kayıt tamamen silinmeli ve toplam kayıt sayısı yine 1 olmalıdır', () => {
+    const client = createSampleClient('Single2');
+
+    try {
+      const v1 = createMockDesign(client.id, 1, 'Sürüm 1 Orijinal');
+      saveClientDesign(client.id, v1);
+      assert.strictEqual(getClientDesigns(client.id).length, 1);
+
+      // İkinci tasarımı kaydet
+      const v2 = createMockDesign(client.id, 2, 'Sürüm 2 Güncellenmiş');
+      saveClientDesign(client.id, v2);
+
+      const designs = getClientDesigns(client.id);
+      assert.strictEqual(designs.length, 1, 'İkinci kayıttan sonra da toplam kayıt sayısı kesinlikle 1 olmalıdır');
+      assert.strictEqual(designs[0].id, v2.id);
+      assert.strictEqual(designs[0].title, 'Sürüm 2 Güncellenmiş');
+      assert.strictEqual(designs[0].recipe.primarySymbol, 'Metatron Küpü');
+
+      // İlk kaydın (v1) kalmadığını doğrula
+      const foundV1 = designs.find((d) => d.id === v1.id);
+      assert.strictEqual(foundV1, undefined, 'Önceki tasarım kaydı tamamen silinmiş olmalıdır');
+    } finally {
+      deleteClientRecord(client.id);
+    }
+  });
+
+  // 4. Üçüncü tasarımda da aynı kural korunur
+  it('4. Üçüncü tasarım kaydedildiğinde de aynı kural korunmalı ve yalnızca üçüncü tasarım kalmalıdır', () => {
+    const client = createSampleClient('Single3');
+
+    try {
+      const v1 = createMockDesign(client.id, 1, 'Tasarım 1');
+      const v2 = createMockDesign(client.id, 2, 'Tasarım 2');
+      const v3 = createMockDesign(client.id, 3, 'Tasarım 3 En Güncel');
 
       saveClientDesign(client.id, v1);
       saveClientDesign(client.id, v2);
       saveClientDesign(client.id, v3);
 
       const designs = getClientDesigns(client.id);
-      assert.strictEqual(designs.length, 3, 'Tam 3 tasarım sürümü arşivde bulunmalıdır');
-      assert.strictEqual(designs[0].versionNumber, 1);
-      assert.strictEqual(designs[1].versionNumber, 2);
-      assert.strictEqual(designs[2].versionNumber, 3);
-      assert.strictEqual(designs[0].recipe.primarySymbol, 'Lotus');
-      assert.strictEqual(designs[1].recipe.primarySymbol, 'Metatron Küpü');
+      assert.strictEqual(designs.length, 1, 'Üçüncü kayıttan sonra da arşivde yalnızca 1 kayıt kalmalıdır');
+      assert.strictEqual(designs[0].id, v3.id);
+      assert.strictEqual(designs[0].title, 'Tasarım 3 En Güncel');
+      assert.strictEqual(designs[0].recipe.primarySymbol, 'Gölge Şahin');
+
+      // v1 ve v2 kayıtlarının kesinlikle olmadığını doğrula
+      assert.strictEqual(designs.some((d) => d.id === v1.id), false);
+      assert.strictEqual(designs.some((d) => d.id === v2.id), false);
     } finally {
       deleteClientRecord(client.id);
     }
   });
 
-  // 2. Geçmiş Sürümü İnceleme ve Salt Okunurluk Güvencesi
-  it('2. Geçmiş sürümü seçmek güncel sürümün veya diğer sürümlerin içeriğini asla değiştirmemelidir', () => {
-    const client = createSampleClient('ReadOnly');
-
-    try {
-      const v1 = createMockDesign(client.id, 1, 'Sürüm 1 Orijinal');
-      const v2 = createMockDesign(client.id, 2, 'Sürüm 2 Güncel');
-
-      saveClientDesign(client.id, v1);
-      saveClientDesign(client.id, v2);
-
-      let archive = getClientArchive(client.id);
-      assert.ok(archive);
-      const latestBefore = archive.designs[archive.designs.length - 1];
-      assert.strictEqual(latestBefore.versionNumber, 2);
-      assert.strictEqual(latestBefore.title, 'Sürüm 2 Güncel');
-
-      // V1 salt okunur olarak inceleniyor (ID seçimi simülasyonu)
-      const selectedV1 = archive.designs.find((d) => d.versionNumber === 1);
-      assert.ok(selectedV1);
-      assert.strictEqual(selectedV1.title, 'Sürüm 1 Orijinal');
-
-      // Arşiv tekrar çekildiğinde güncel sürüm (V2) bozulmamış ve değişmemiş olmalıdır
-      archive = getClientArchive(client.id);
-      assert.strictEqual(archive?.designs.length, 2);
-      assert.strictEqual(archive?.designs[1].title, 'Sürüm 2 Güncel');
-      assert.strictEqual(archive?.designs[0].title, 'Sürüm 1 Orijinal');
-    } finally {
-      deleteClientRecord(client.id);
-    }
-  });
-
-  // 3. Danışan İzolasyonu: Farklı Danışanların Sürümleri Birbirine Asla Karışmamalıdır
-  it('3. Danışan A nın tasarım sürümleri Danışan B nin arşivinde görünmemeli ve etkilememelidir', () => {
+  // 5. Danışan A nın tasarımı güncellenirken danışan B nin tasarımı korunur
+  it('5. Danışan A nın tasarımı güncellenirken Danışan B nin tasarımı kesinlikle korunmalıdır', () => {
     const clientA = createSampleClient('IsoA');
     const clientB = createSampleClient('IsoB');
 
     try {
-      const designA1 = createMockDesign(clientA.id, 1, 'Client A Özel Mandala');
-      const designA2 = createMockDesign(clientA.id, 2, 'Client A Özel Şahin');
-      const designB1 = createMockDesign(clientB.id, 1, 'Client B Özel Ejderha');
+      const designA1 = createMockDesign(clientA.id, 1, 'Client A İlk Tasarım');
+      const designB = createMockDesign(clientB.id, 1, 'Client B Özel Tasarım');
 
       saveClientDesign(clientA.id, designA1);
-      saveClientDesign(clientA.id, designA2);
-      saveClientDesign(clientB.id, designB1);
+      saveClientDesign(clientB.id, designB);
 
-      const archiveA = getClientArchive(clientA.id);
-      const archiveB = getClientArchive(clientB.id);
-
-      assert.strictEqual(archiveA?.designs.length, 2, 'Danışan A yalnızca 2 tasarıma sahip olmalıdır');
-      assert.strictEqual(archiveB?.designs.length, 1, 'Danışan B yalnızca 1 tasarıma sahip olmalıdır');
-
-      // Her tasarımın kendi clientId sine sahip olduğunu doğrula
-      archiveA?.designs.forEach((d) => assert.strictEqual(d.clientId, clientA.id));
-      archiveB?.designs.forEach((d) => assert.strictEqual(d.clientId, clientB.id));
-
-      // Danışan A dan bir sürüm silindiğinde Danışan B asla etkilenmemelidir
-      deleteClientDesign(clientA.id, designA1.id);
       assert.strictEqual(getClientDesigns(clientA.id).length, 1);
       assert.strictEqual(getClientDesigns(clientB.id).length, 1);
-      assert.strictEqual(getClientDesigns(clientB.id)[0].title, 'Client B Özel Ejderha');
+
+      // Danışan A nın tasarımını güncelle
+      const designA2 = createMockDesign(clientA.id, 2, 'Client A Güncel Tasarım');
+      saveClientDesign(clientA.id, designA2);
+
+      const designsA = getClientDesigns(clientA.id);
+      const designsB = getClientDesigns(clientB.id);
+
+      assert.strictEqual(designsA.length, 1, 'Danışan A yalnızca 1 güncel tasarıma sahip olmalıdır');
+      assert.strictEqual(designsA[0].title, 'Client A Güncel Tasarım');
+
+      assert.strictEqual(designsB.length, 1, 'Danışan B nin tasarımı kesinlikle korunmalıdır');
+      assert.strictEqual(designsB[0].title, 'Client B Özel Tasarım');
+      assert.strictEqual(designsB[0].clientId, clientB.id);
     } finally {
       deleteClientRecord(clientA.id);
       deleteClientRecord(clientB.id);
     }
   });
 
-  // 4. Arşiv Boş Durumu ve Sürüm Silme Güvenliği
-  it('4. Arşiv boşken veya bir sürüm silindiğinde sistem güvenli davranmalıdır', () => {
-    const client = createSampleClient('EmptyCheck');
+  // 6. Sayfa yenileme veya storage dan yeniden yükleme sonrasında eski kayıt geri gelmez
+  it('6. Storage dan yeniden yükleme (getClientArchive / getClientDesigns) sonrasında eski kayıt asla geri gelmemelidir', () => {
+    const client = createSampleClient('ReloadTest');
 
     try {
-      // Başlangıçta 0 tasarım
-      let designs = getClientDesigns(client.id);
-      assert.strictEqual(designs.length, 0, 'Başlangıçta arşiv boş olmalıdır');
-
-      const v1 = createMockDesign(client.id, 1, 'Geçici Sürüm');
+      const v1 = createMockDesign(client.id, 1, 'Eski İlk Tasarım');
       saveClientDesign(client.id, v1);
-      assert.strictEqual(getClientDesigns(client.id).length, 1);
 
-      // Sürümü sil
-      const deleted = deleteClientDesign(client.id, v1.id);
-      assert.strictEqual(deleted, true);
-      assert.strictEqual(getClientDesigns(client.id).length, 0);
+      const v2 = createMockDesign(client.id, 2, 'Kalıcı Yeni Tasarım');
+      saveClientDesign(client.id, v2);
 
-      // Olmayan sürümü silmeye çalışma
-      const fakeDelete = deleteClientDesign(client.id, 'olmayan_id');
-      assert.strictEqual(fakeDelete, false);
+      // Simüle edilen depolama yeniden okuma
+      const archive = getClientArchive(client.id);
+      assert.ok(archive);
+      assert.strictEqual(archive.designs.length, 1, 'Arşivde de kesinlikle tek 1 tasarım bulunmalıdır');
+      assert.strictEqual(archive.designs[0].id, v2.id);
+      assert.strictEqual(archive.designs[0].title, 'Kalıcı Yeni Tasarım');
+
+      const reloadedDesigns = getClientDesigns(client.id);
+      assert.strictEqual(reloadedDesigns.length, 1);
+      assert.strictEqual(reloadedDesigns[0].id, v2.id);
     } finally {
       deleteClientRecord(client.id);
     }
   });
 
-  // 5. Geriye Dönük Uyumluluk ve Eksiksiz Veri Modeli
-  it('5. Tasarım kayıtları tüm veri modeli alanlarını (reçete, aiPrompt, tarih) eksiksiz muhafaza etmelidir', () => {
-    const client = createSampleClient('CompatCheck');
+  // 7. Danışan silindiğinde yalnızca o danışanın tasarımı silinir
+  it('7. Danışan silindiğinde yalnızca o danışanın tasarımı silinmeli, diğer danışanlar korunmalıdır', () => {
+    const clientA = createSampleClient('DeleteA');
+    const clientB = createSampleClient('DeleteB');
+
+    try {
+      const designA = createMockDesign(clientA.id, 1, 'Tasarım A');
+      const designB = createMockDesign(clientB.id, 1, 'Tasarım B');
+
+      saveClientDesign(clientA.id, designA);
+      saveClientDesign(clientB.id, designB);
+
+      assert.strictEqual(getClientDesigns(clientA.id).length, 1);
+      assert.strictEqual(getClientDesigns(clientB.id).length, 1);
+
+      // Danışan A yı sil
+      deleteClientRecord(clientA.id);
+
+      assert.strictEqual(getClientDesigns(clientA.id).length, 0, 'Silinen danışanın tasarımı silinmelidir');
+      assert.strictEqual(getClientDesigns(clientB.id).length, 1, 'Danışan B nin tasarımı korunmalıdır');
+      assert.strictEqual(getClientDesigns(clientB.id)[0].title, 'Tasarım B');
+    } finally {
+      deleteClientRecord(clientB.id);
+    }
+  });
+
+  // 8. Bütünleşik Veri Modeli Uyumluluğu
+  it('8. Tekil güncel tasarım kaydı tüm reçete ve aiPrompt alanlarını eksiksiz muhafaza etmelidir', () => {
+    const client = createSampleClient('ModelCheck');
 
     try {
       const design = createMockDesign(client.id, 1, 'Bütünleşik Test Tasarımı');
@@ -197,7 +237,9 @@ describe('A25: Danışan Arşivi ve Tasarım Sürüm Yönetimi Doğrulama Testle
 
       const loaded = getClientDesigns(client.id)[0];
       assert.ok(loaded.id);
+      assert.strictEqual(loaded.clientId, client.id);
       assert.ok(loaded.createdAt);
+      assert.ok(loaded.updatedAt);
       assert.ok(loaded.recipe.style);
       assert.ok(loaded.recipe.recommendedPlacement);
       assert.ok(loaded.recipe.recommendedDimensionsCm);

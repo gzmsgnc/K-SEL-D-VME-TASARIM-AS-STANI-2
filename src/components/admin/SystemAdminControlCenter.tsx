@@ -48,7 +48,7 @@ export const SystemAdminControlCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('METRICS_STATUS');
 
   // Geri bildirim durumu
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
 
   // Kopyalama durumu
   const [copiedBackup, setCopiedBackup] = useState(false);
@@ -183,12 +183,29 @@ export const SystemAdminControlCenter: React.FC = () => {
         });
         return;
       }
-      resetAllSystemData();
+      const resetRes = resetAllSystemData();
       setResetAllConfirmInput('');
-      setFeedback({
-        type: 'success',
-        message: 'Tüm uygulama verisi güvenle sıfırlandı. Sistem temiz başlangıç durumuna getirildi.',
-      });
+      if (resetRes.storageStatus === 'persisted') {
+        setFeedback({
+          type: 'success',
+          message: 'Tüm uygulama verisi kalıcı depolamadan güvenle sıfırlandı. Sistem temiz başlangıç durumuna getirildi.',
+        });
+      } else if (resetRes.storageStatus === 'memory_only') {
+        setFeedback({
+          type: 'warning',
+          message: 'Veriler oturum belleğinden temizlendi ancak kalıcı depolamaya (localStorage) erişilemediğinden tarayıcı yenilendiğinde eski veriler tekrar yüklenebilir.',
+        });
+      } else if (resetRes.storageStatus === 'partial_failure') {
+        setFeedback({
+          type: 'warning',
+          message: 'Bazı veri anahtarları kalıcı olarak silinemedi ve oturum belleğinde tutuldu. Tam sıfırlama sağlanamadı.',
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message: resetRes.error || 'Uygulama verileri sıfırlanamadı. Kalıcı depolamaya erişim engellendi.',
+        });
+      }
     }
 
     setDangerAction(null);

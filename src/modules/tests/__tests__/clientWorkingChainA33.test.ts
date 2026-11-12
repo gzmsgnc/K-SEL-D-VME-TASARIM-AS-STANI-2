@@ -223,6 +223,7 @@ describe('A33 — Gerçek Danışan Kesintisiz Çalışma Zinciri Test Paketi', 
 
       assert.ok(!pEn.includes('sevgi'), 'Anne adı İngilizce isteme sızamaz.');
       assert.ok(!pTr.includes('sevgi'), 'Anne adı Türkçe konsepte sızamaz.');
+      assert.ok(!pNeg.includes('sevgi'), 'Anne adı negatif isteme de giremez.');
       assert.ok(!pEn.includes('akrep'), 'Hariç tutulan sembol ana isteme giremez.');
       assert.ok(pNeg.includes('akrep'), 'Hariç tutulan sembol negatif isteme eklenmelidir.');
     } finally {
@@ -327,9 +328,9 @@ describe('A33 — Gerçek Danışan Kesintisiz Çalışma Zinciri Test Paketi', 
       saveClientDesign(client.id, resV2.design);
 
       archive = getClientArchive(client.id)!;
-      assert.strictEqual(archive.designs.length, 2, 'V1 ve V2 bir arada saklanmalıdır.');
+      assert.strictEqual(archive.designs.length, 1, 'Tekil güncel kayıt ilkesi: önceki tasarım silinmeli ve 1 güncel kayıt kalmalıdır.');
       assert.strictEqual(archive.designs[0].versionNumber, 1);
-      assert.strictEqual(archive.designs[1].versionNumber, 2);
+      assert.strictEqual(archive.designs[0].recipe.style, 'SACRED_GEOMETRY');
 
       // Tasarımları sıfırla
       clearClientDesigns(client.id);

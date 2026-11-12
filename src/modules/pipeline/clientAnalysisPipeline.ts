@@ -3,8 +3,8 @@ import { NumerologyAnalysis, ChakraAnalysis, ArchetypeAnalysis } from '../../typ
 import { TropicalNatalChart } from '../../types/astrology';
 import { ClientArchiveRecord } from '../../types/archive';
 import { ClientTattooDesign } from '../../types/design';
-import { calculateClientNumerology } from '../numerology';
-import { calculateClientTropicalChart } from '../astrology';
+import { calculateClientNumerology, isNumerologyStale } from '../numerology';
+import { calculateClientTropicalChart, isAstrologyChartStale } from '../astrology';
 import { calculateClientChakra } from '../chakra';
 import { calculateClientArchetype } from '../archetype';
 import { generateClientRecipe, RecipeGenerationOptions } from '../recipe';
@@ -393,7 +393,12 @@ export function getClientAnalysisChainStatus(
   let numStatus: AnalysisModuleStatus = 'Kayıt bulunmuyor';
   let numMessage = 'Numeroloji analizi kaydı bulunmuyor.';
   let numError: string | undefined = undefined;
-  const hasNumRecord = Boolean(activeAnalysis?.numerology && typeof activeAnalysis.numerology.lifePathNumber === 'number');
+  const isNumStale = activeAnalysis?.numerology ? isNumerologyStale(activeAnalysis.numerology, client) : false;
+  const hasNumRecord = Boolean(
+    activeAnalysis?.numerology &&
+    !isNumStale &&
+    typeof activeAnalysis.numerology.lifePathNumber === 'number'
+  );
 
   if (hasNumRecord) {
     numStatus = 'Tamamlandı';
@@ -403,7 +408,10 @@ export function getClientAnalysisChainStatus(
     const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ').trim();
     const hasBirthDate = Boolean(client.birthDate && client.birthDate.trim().length > 0);
 
-    if (errorMatch && (errorMatch.includes('motorunda') || errorMatch.includes('hata'))) {
+    if (isNumStale) {
+      numStatus = 'Eksik veri';
+      numMessage = 'Danışanın ad, soyad veya doğum tarihi değiştiği için kayıtlı numeroloji analizi geçersizdir. Yeniden hesaplanmalıdır.';
+    } else if (errorMatch && (errorMatch.includes('motorunda') || errorMatch.includes('hata'))) {
       numStatus = 'Hata';
       numError = errorMatch;
       numMessage = 'Numeroloji motorunda hesaplama hatası oluştu.';
@@ -420,8 +428,10 @@ export function getClientAnalysisChainStatus(
   let astroStatus: AnalysisModuleStatus = 'Kayıt bulunmuyor';
   let astroMessage = 'Batı / Tropical doğum haritası kaydı bulunmuyor.';
   let astroError: string | undefined = undefined;
+  const isAstroStale = activeAnalysis?.astrology ? isAstrologyChartStale(activeAnalysis.astrology, client) : false;
   const hasAstroRecord = Boolean(
     activeAnalysis?.astrology &&
+    !isAstroStale &&
     activeAnalysis.astrology.sunSign &&
     activeAnalysis.astrology.planetaryPositions &&
     activeAnalysis.astrology.planetaryPositions.length > 0
@@ -460,6 +470,7 @@ export function getClientAnalysisChainStatus(
   let chakraMessage = '7 Temel Çakra analizi kaydı bulunmuyor.';
   let chakraError: string | undefined = undefined;
   const hasChakraRecord = Boolean(
+    hasNumRecord &&
     activeAnalysis?.chakra &&
     activeAnalysis.chakra.dominantChakra &&
     activeAnalysis.chakra.chakras &&
@@ -489,6 +500,8 @@ export function getClientAnalysisChainStatus(
   let archMessage = 'Birleşik ve Gölge Arketip analizi kaydı bulunmuyor.';
   let archError: string | undefined = undefined;
   const hasArchRecord = Boolean(
+    hasNumRecord &&
+    hasChakraRecord &&
     activeAnalysis?.archetype &&
     activeAnalysis.archetype.unifiedArchetype &&
     activeAnalysis.archetype.unifiedArchetype.primary

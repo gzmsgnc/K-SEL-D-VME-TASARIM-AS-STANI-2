@@ -26,6 +26,9 @@ import {
   formatAllVisualPromptsSectionCopyText,
   formatRecipeSectionCopyText,
 } from '../../utils/clientComprehensiveCopy';
+import { ClientTattooReport } from '../../types/report';
+import { evaluateDesignCompletionReadiness } from '../../utils/navigationGuard';
+import { isClientDesignCompleted } from '../../store/storage';
 import {
   Palette,
   CheckCircle2,
@@ -33,6 +36,7 @@ import {
   Sparkles,
   History,
   ArrowRight,
+  ArrowLeft,
   Trash2,
   Copy,
   Check,
@@ -48,6 +52,7 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 
 interface ClientTattooDesignResultHubProps {
@@ -63,7 +68,7 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
   onNavigateToTab,
   onStartNewDesignVersion,
 }) => {
-  const { deleteClientDesign } = useApp();
+  const { deleteClientDesign, saveClientDesign, saveClientReport } = useApp();
 
   // Seçili sürüm (null ise en güncel sürüm gösterilir)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -71,6 +76,7 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
   const [copiedFeedbackMessage, setCopiedFeedbackMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expandedSymbolIndex, setExpandedSymbolIndex] = useState<number | null>(null);
+  const [completionFeedback, setCompletionFeedback] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
 
   // Danışana ait tasarımlar (A25 / A30 Danışan İzolasyonu: SADECE aktif clientId)
   const clientDesigns: ClientTattooDesign[] = useMemo(() => {
@@ -82,19 +88,13 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
 
   const latestDesign = clientDesigns[0] || null;
 
-  // Görüntülenen aktif tasarım
+  // Görüntülenen aktif tasarım (Tekil güncel kayıt)
   const activeDesign: ClientTattooDesign | null = useMemo(() => {
     if (!clientDesigns.length) return null;
-    if (selectedVersionId) {
-      return clientDesigns.find((d) => d.id === selectedVersionId) || latestDesign;
-    }
     return latestDesign;
-  }, [clientDesigns, selectedVersionId, latestDesign]);
+  }, [clientDesigns, latestDesign]);
 
-  // Geçmiş sürüm mü inceleniyor? (Salt okunur kontrolü)
-  const isViewingHistoricalVersion = Boolean(
-    activeDesign && latestDesign && activeDesign.id !== latestDesign.id
-  );
+  const isViewingHistoricalVersion = false;
 
   // A34: 9 Durumlu Tasarım Aşaması Tespiti
   const designStage = useMemo(() => {
@@ -118,6 +118,113 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
     } catch {
       setCopiedFeedbackMessage('Kopyalama işlemi gerçekleştirilemedi.');
       setTimeout(() => setCopiedFeedbackMessage(null), 2500);
+    }
+  };
+
+  // A34 & Kural 1: Kalıcı tamamlanma durumu: Merkezi doğruluk kaynağı (isClientDesignCompleted) üzerinden okunur
+  const isPersistentlyCompleted = useMemo(() => {
+    if (!client || !client.id || !activeDesign) return false;
+    return isClientDesignCompleted(client.id, activeDesign.id);
+  }, [client.id, activeDesign?.id, activeDesign?.isCompleted, activeDesign?.versionNumber, archive?.reports, archive?.designs]);
+
+  // A34 & Kural 2: Tasarım tamamlanma hazırlık denetimi (Kilit Mekanizması)
+  const completionReadiness = useMemo(() => {
+    return evaluateDesignCompletionReadiness(client, archive, activeDesign);
+  }, [client, archive, activeDesign]);
+
+  const handleCompleteProcess = () => {
+    setCompletionFeedback(null);
+
+    // Kilit Denetimi: Eksik tasarımda kesinlikle engelle
+    if (!completionReadiness.isReady || !activeDesign) {
+      setCompletionFeedback({
+        type: 'error',
+        message: `Tasarım süreci tamamlanamaz. Eksikler: ${completionReadiness.missingOutputsTr.join('; ')}`,
+      });
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+
+      // 1. Dövme tasarım kaydını isCompleted: true olarak kalıcı kaydet
+      const updatedDesign: ClientTattooDesign = {
+        ...activeDesign,
+        isCompleted: true,
+        completedAt: now,
+      };
+      const designSaveRes = saveClientDesign(client.id, updatedDesign);
+      if (!designSaveRes.success) {
+        setCompletionFeedback({
+          type: 'error',
+          message: designSaveRes.error || 'Dövme tasarımı tamamlanma durumu kaydedilemedi.',
+        });
+        return;
+      }
+
+      // 2. Kalıcı nihai raporu (ClientTattooReport) arşive kaydet (İdempotent)
+      const completionReport: ClientTattooReport = {
+        id: `report_${client.id}_v${activeDesign.versionNumber}`,
+        clientId: client.id,
+        version: activeDesign.versionNumber,
+        title: `${client.firstName} ${client.lastName} — ${activeDesign.title || 'Dövme Tasarım Raporu'}`,
+        generatedAt: now,
+        confidentialityNote: 'Bu rapor kişiye özel olup ezoterik ve anatomik tasarım direktiflerini içerir.',
+        sections: [
+          {
+            sectionKey: 'PERSONAL_PROFILE',
+            title: 'Danışan Profili',
+            summaryText: `${client.firstName} ${client.lastName} (${client.birthDate}, ${client.birthLocation?.city || 'Şehir'})`,
+            keyTakeaways: [client.birthDate, client.birthLocation?.placeName || ''],
+          },
+          {
+            sectionKey: 'TATTOO_RECIPE',
+            title: 'Dövme Reçetesi',
+            summaryText: `${activeDesign.recipe.style} stili, ${activeDesign.recipe.recommendedPlacement} yerleşimi.`,
+            keyTakeaways: [
+              `Boyut: ${activeDesign.recipe.recommendedDimensionsCm.width}x${activeDesign.recipe.recommendedDimensionsCm.height} cm`,
+              `Renk: ${activeDesign.recipe.colorProfile}`,
+            ],
+          },
+          {
+            sectionKey: 'AI_PROMPT',
+            title: 'Görsel Tasarım İstemi',
+            summaryText: activeDesign.aiPrompt?.conceptPromptTr || 'Konsept açıklaması mevcut.',
+            keyTakeaways: [activeDesign.aiPrompt?.primaryPromptEn || ''],
+          },
+        ],
+      };
+
+      const reportSaveRes = saveClientReport(client.id, completionReport);
+      if (!reportSaveRes.success) {
+        setCompletionFeedback({
+          type: 'error',
+          message: reportSaveRes.error || 'Nihai rapor arşive işlenemedi.',
+        });
+        return;
+      }
+
+      if (
+        designSaveRes.storageStatus === 'memory_only' ||
+        reportSaveRes.storageStatus === 'memory_only' ||
+        designSaveRes.storageStatus === 'partial_failure' ||
+        reportSaveRes.storageStatus === 'partial_failure'
+      ) {
+        setCompletionFeedback({
+          type: 'warning',
+          message: 'Dövme tasarım süreci tamamlandı, ancak veriler yalnızca oturum belleğine yazıldı (sayfa yenilenirse kaybolabilir).',
+        });
+      } else {
+        setCompletionFeedback({
+          type: 'success',
+          message: 'Dövme tasarım süreci eksiksiz tamamlandı ve arşive kalıcı olarak işlendi.',
+        });
+      }
+    } catch (err: any) {
+      setCompletionFeedback({
+        type: 'error',
+        message: err?.message || 'Tamamlama işlemi sırasında beklenmeyen bir hata oluştu.',
+      });
     }
   };
 
@@ -200,7 +307,7 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                 className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm shadow-amber-950/30"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Yeni Sürüm Üret (V{clientDesigns.length + 1})</span>
+                <span>Yeni Tasarım Üret</span>
               </button>
             )}
           </div>
@@ -221,86 +328,25 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
           </div>
         </div>
 
-        {/* GEÇMİŞ SÜRÜM ŞERİDİ (SALT OKUNUR) */}
-        {isViewingHistoricalVersion && latestDesign && (
-          <div className="p-3.5 bg-amber-950/40 border border-amber-600/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-amber-500/20 text-amber-400 rounded-lg shrink-0">
-                <History className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-bold text-amber-300 flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Geçmiş Sürüm — Salt Okunur: V{activeDesign.versionNumber} ({activeDesign.title})</span>
-                </span>
-                <span className="text-[11px] text-stone-400 block mt-0.5">
-                  Kayıt Tarihi: {new Date(activeDesign.createdAt).toLocaleString('tr-TR')} • Bu geçmiş sürümün incelenmesi güncel reçeteyi değiştirmez ve üzerine yazılmaz.
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelectedVersionId(latestDesign.id)}
-              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-lg transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              <span>Güncel Sürüme Dön (V{latestDesign.versionNumber})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* SÜRÜM SEÇİCİ VE DURUM ÇUBUĞU */}
+        {/* TEKİL GÜNCEL TASARIM DURUM ÇUBUĞU */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-stone-950/60 border border-stone-800 rounded-xl p-3">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-[11px] font-mono text-stone-400 font-semibold uppercase tracking-wider mr-1 flex items-center gap-1">
-              <History className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sürümler ({clientDesigns.length}):</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-stone-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Tasarım Durumu:</span>
             </span>
 
-            {/* Aktif Sürüm Rozeti: Güncel vs Arşiv — Salt Okunur */}
-            {isViewingHistoricalVersion ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-950/80 border border-amber-800 text-amber-300 flex items-center gap-1 shrink-0">
-                <Lock className="w-3 h-3" />
-                <span>Arşiv — Salt Okunur</span>
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-950/80 border border-emerald-800 text-emerald-300 flex items-center gap-1 shrink-0">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Güncel</span>
-              </span>
-            )}
-
-            {clientDesigns.map((d) => {
-              const isLatest = d.id === latestDesign?.id;
-              const isSelected = d.id === activeDesign.id;
-              return (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setSelectedVersionId(d.id)}
-                  className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-amber-500 text-stone-950 font-bold shadow'
-                      : 'bg-stone-900 text-stone-300 border border-stone-800 hover:text-stone-100 hover:border-stone-700'
-                  }`}
-                >
-                  <span>V{d.versionNumber}</span>
-                  <span className="text-[10px] opacity-75">
-                    {isLatest ? '(Güncel)' : '(Arşiv)'}
-                  </span>
-                </button>
-              );
-            })}
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-950/80 border border-emerald-800 text-emerald-300 flex items-center gap-1 shrink-0">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Tekil Güncel Kayıt (V{activeDesign.versionNumber})</span>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isViewingHistoricalVersion ? (
-              <span className="text-[11px] text-stone-500 italic flex items-center gap-1">
-                <Lock className="w-3 h-3" />
-                <span>Geçmiş sürüm salt okunurdur</span>
-              </span>
-            ) : showDeleteConfirm ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-stone-400 hidden sm:inline">
+              Son Güncelleme: {new Date(activeDesign.updatedAt || activeDesign.createdAt).toLocaleString('tr-TR')}
+            </span>
+            {showDeleteConfirm ? (
               <div className="flex items-center gap-1.5 bg-rose-950/40 border border-rose-800/80 rounded-lg p-1">
                 <button
                   type="button"
@@ -493,9 +539,9 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
             </div>
 
             <div className="p-2.5 bg-stone-950/60 border border-stone-800 rounded-lg space-y-1">
-              <span className="text-[10px] uppercase font-mono text-stone-500 block">Tasarım Sürümü</span>
+              <span className="text-[10px] uppercase font-mono text-stone-500 block">Tasarım Durumu</span>
               <span className="font-mono font-bold text-amber-400 block">
-                V{activeDesign.versionNumber} {isViewingHistoricalVersion ? '(Arşiv)' : '(Güncel)'}
+                V{activeDesign.versionNumber} (Güncel Kayıt)
               </span>
             </div>
 
@@ -581,14 +627,14 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
 
             {/* İkincil Semboller */}
             <div className="p-3 bg-stone-950/70 border border-stone-800 rounded-lg space-y-1.5">
-              <span className="text-[10px] uppercase font-mono text-stone-400 font-bold block">
+              <span className="text-[10px] uppercase font-mono text-indigo-400 font-bold block">
                 İkincil Semboller ({recipe.secondarySymbols?.length || 0})
               </span>
               {recipe.secondarySymbols && recipe.secondarySymbols.length > 0 ? (
                 <ul className="space-y-1">
                   {recipe.secondarySymbols.map((s, idx) => (
                     <li key={idx} className="text-stone-300 text-[11px] flex items-start gap-1.5">
-                      <span className="text-amber-400 shrink-0">•</span>
+                      <span className="text-indigo-400 shrink-0">•</span>
                       <span>{s}</span>
                     </li>
                   ))}
@@ -597,6 +643,23 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                 <span className="text-stone-500 italic block">Kayıt bulunmuyor.</span>
               )}
             </div>
+
+            {/* Vurgu Sembolleri (ADIM 2B: Asla İkincile Dönüştürülmez) */}
+            {recipe.accentSymbols && recipe.accentSymbols.length > 0 && (
+              <div className="p-3 bg-stone-950/70 border border-emerald-950/40 rounded-lg space-y-1.5">
+                <span className="text-[10px] uppercase font-mono text-emerald-400 font-bold block">
+                  Vurgu Sembolleri ({recipe.accentSymbols.length})
+                </span>
+                <ul className="space-y-1">
+                  {recipe.accentSymbols.map((s, idx) => (
+                    <li key={idx} className="text-emerald-200 text-[11px] flex items-start gap-1.5">
+                      <span className="text-emerald-400 shrink-0">✦</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Hariç Tutulan Semboller & Totem Durumu */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -621,15 +684,28 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
               </div>
             </div>
 
-            {/* A57: Her Sembol İçin 7 Kriterli Gerekçe Listesi */}
+            {/* A57 & A64: Her Sembol İçin Ayrıntılı Gerekçe Listesi (Veri Bütünlüğü Korumalı) */}
             {recipe.comprehensiveReport?.sectionC?.symbols && recipe.comprehensiveReport.sectionC.symbols.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-stone-800">
                 <span className="text-[10px] uppercase font-mono text-amber-400 font-bold block">
-                  Sembol Gerekçeleri & Katman Analizi (7 Kriter)
+                  Sembol Gerekçeleri & Katman Analizi ({recipe.comprehensiveReport.sectionC.symbols.length} Sembol)
                 </span>
                 <div className="space-y-2">
                   {recipe.comprehensiveReport.sectionC.symbols.map((sym, idx) => {
                     const isExpanded = expandedSymbolIndex === idx;
+                    const weightLabel =
+                      sym.weight === 'PRIMARY'
+                        ? 'BİRİNCİL (Merkezi Odak)'
+                        : sym.weight === 'ACCENT'
+                        ? 'VURGU (Mikro Detay)'
+                        : 'İKİNCİL (Tamamlayıcı)';
+                    const weightBadgeClass =
+                      sym.weight === 'PRIMARY'
+                        ? 'bg-amber-950/60 border-amber-600/60 text-amber-300'
+                        : sym.weight === 'ACCENT'
+                        ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300'
+                        : 'bg-indigo-950/60 border-indigo-700/60 text-indigo-300';
+
                     return (
                       <div key={idx} className="p-2.5 bg-stone-950/90 border border-stone-800 rounded-lg space-y-2">
                         <button
@@ -637,43 +713,90 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
                           onClick={() => setExpandedSymbolIndex(isExpanded ? null : idx)}
                           className="w-full flex items-center justify-between text-left cursor-pointer"
                         >
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[11px] font-bold text-amber-300">
                               {sym.symbolName}
                             </span>
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-stone-900 border border-stone-800 text-stone-400">
-                              {sym.weight === 'PRIMARY' ? 'Merkezi Odak' : 'İkincil / Akış'}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${weightBadgeClass}`}>
+                              {weightLabel}
                             </span>
+                            {sym.symbolId && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-stone-900 border border-stone-800 text-stone-400">
+                                #{sym.symbolId}
+                              </span>
+                            )}
                           </div>
                           {isExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+                            <ChevronUp className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                           ) : (
-                            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                            <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                           )}
                         </button>
 
                         {isExpanded && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-stone-800/80 text-[11px]">
+                            {/* Danışanın Kişisel Anlamı (Sadece danışan girmişse gösterilir, boşsa uydurma metin yok) */}
+                            {sym.customMeaning && (
+                              <div className="sm:col-span-2 p-2 bg-amber-950/20 border border-amber-800/40 rounded space-y-0.5">
+                                <span className="text-[10px] text-amber-400 block font-semibold">
+                                  Danışanın Kişisel Niyeti & Anlamı:
+                                </span>
+                                <span className="text-amber-200 text-xs italic">"{sym.customMeaning}"</span>
+                              </div>
+                            )}
+
                             <div>
                               <span className="text-[10px] text-stone-500 block">Kaynak:</span>
                               <span className="text-stone-300">{sym.originAnalysis} ({sym.originValue})</span>
                             </div>
-                            <div>
-                              <span className="text-[10px] text-stone-500 block">Kişisel Tema:</span>
-                              <span className="text-stone-300">{sym.personalTheme}</span>
-                            </div>
+
                             <div>
                               <span className="text-[10px] text-stone-500 block">Kompozisyondaki Rol:</span>
                               <span className="text-stone-300">{sym.compositionRole}</span>
                             </div>
+
+                            {sym.traditionalMeaningTr && (
+                              <div>
+                                <span className="text-[10px] text-stone-500 block">Geleneksel / Tarihsel Anlam:</span>
+                                <span className="text-stone-300">{sym.traditionalMeaningTr}</span>
+                              </div>
+                            )}
+
+                            {sym.esotericMeaningTr && (
+                              <div>
+                                <span className="text-[10px] text-stone-500 block">Modern Ezoterik Anlam:</span>
+                                <span className="text-stone-300">{sym.esotericMeaningTr}</span>
+                              </div>
+                            )}
+
                             <div>
-                              <span className="text-[10px] text-stone-500 block">İlişkili Sembol:</span>
+                              <span className="text-[10px] text-stone-500 block">İlişkili Sembol / Eksen:</span>
                               <span className="text-stone-300">{sym.relatedSymbol}</span>
                             </div>
+
+                            <div>
+                              <span className="text-[10px] text-stone-500 block">Kişisel Tema / İfade:</span>
+                              <span className="text-stone-300">{sym.personalTheme}</span>
+                            </div>
+
                             <div className="sm:col-span-2">
                               <span className="text-[10px] text-stone-500 block">Görsel İşleniş:</span>
                               <span className="text-stone-300">{sym.visualExecution}</span>
                             </div>
+
+                            {sym.analysisAssociations && sym.analysisAssociations.length > 0 && (
+                              <div className="sm:col-span-2 space-y-1">
+                                <span className="text-[10px] text-stone-500 block font-semibold">Analiz Bağlantıları:</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {sym.analysisAssociations.map((assoc, aIdx) => (
+                                    <span key={aIdx} className="px-1.5 py-0.5 bg-stone-900 border border-stone-800 rounded text-[10px] text-stone-300">
+                                      <strong className="text-amber-400">{assoc.module}:</strong> {assoc.target} — {assoc.rationaleTr}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="sm:col-span-2 text-rose-300/90 bg-rose-950/20 p-1.5 rounded border border-rose-900/30">
                               <span className="text-[10px] text-rose-400 block font-semibold">Katman Kaybı Riski:</span>
                               <span>{sym.meaningRiskIfRemoved}</span>
@@ -1090,6 +1213,128 @@ export const ClientTattooDesignResultHub: React.FC<ClientTattooDesignResultHubPr
               </div>
             </div>
           )}
+
+          {/* AŞAMA 6 (SON SAYFA) SÜREÇ TAMAMLAMA & GERİ DÖNÜŞ NAVİGASYON ALANI */}
+          <div className="p-4 bg-stone-900/95 border border-stone-800 rounded-xl space-y-3 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {onNavigateToTab && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToTab('SYMBOLS')}
+                    className="px-3.5 py-2 rounded-lg text-xs font-medium text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Geri: Sembol Seçimi</span>
+                  </button>
+                )}
+                <span className="text-xs text-stone-400 font-mono hidden sm:inline">
+                  (Son Aşama · {clientDesigns.length} Sürüm Kayıtlı)
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 self-end sm:self-center">
+                {onNavigateToTab && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToTab('RESULTS')}
+                    className="px-3.5 py-2 text-xs font-medium text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Sonuçlar Özeti</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCompleteProcess}
+                  disabled={!completionReadiness.isReady}
+                  className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isPersistentlyCompleted
+                      ? 'bg-emerald-600 text-white shadow-emerald-950/40'
+                      : 'bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-stone-950 shadow-emerald-950/30'
+                  }`}
+                  title={
+                    !completionReadiness.isReady
+                      ? `Eksikler: ${completionReadiness.missingOutputsTr.join(', ')}`
+                      : 'Tasarım sürecini tamamla ve arşive kalıcı olarak kaydet'
+                  }
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isPersistentlyCompleted ? 'Tasarım Süreci Tamamlandı ✓' : 'Tasarım Sürecini Tamamla'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Eksik Çıktı Kilidi ve Türkçe Uyarı Kutusu */}
+            {!completionReadiness.isReady && (
+              <div className="p-3 bg-rose-950/30 border border-rose-900/60 rounded-lg text-xs text-rose-300 space-y-1.5">
+                <div className="flex items-center gap-2 font-semibold text-rose-200">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>Tasarım Tamamlama Kilidi: Süreç Henüz Tamamlanamaz</span>
+                </div>
+                <p className="text-[11px] text-rose-300/90 leading-relaxed">
+                  Dövme tasarım sürecini kalıcı olarak arşive işleyebilmek için aşağıdaki zorunlu çıktıların üretilmiş olması gerekmektedir:
+                </p>
+                <ul className="list-disc list-inside text-[11px] text-rose-300/80 space-y-0.5 pt-0.5 font-mono">
+                  {completionReadiness.missingOutputsTr.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Hata veya Başarı Geri Bildirim Bildirimi */}
+            {completionFeedback && (
+              <div
+                className={`p-3 rounded-lg text-xs flex items-center justify-between border ${
+                  completionFeedback.type === 'error'
+                    ? 'bg-rose-950/40 border-rose-800 text-rose-300'
+                    : completionFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800 text-amber-300'
+                    : 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {completionFeedback.type === 'error' ? (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  ) : completionFeedback.type === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  )}
+                  <span>{completionFeedback.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCompletionFeedback(null)}
+                  className="text-stone-400 hover:text-white p-1 rounded cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Kalıcı Olarak Tamamlanmış Tasarım Bilgilendirmesi */}
+            {isPersistentlyCompleted && (
+              <div className="p-3.5 bg-emerald-950/30 border border-emerald-800/60 rounded-lg text-xs text-emerald-300 flex items-start gap-2.5 animate-in fade-in duration-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-emerald-200">
+                    Dövme Tasarım Süreci Eksiksiz Tamamlandı ve Arşivlendi! ✓
+                  </div>
+                  <p className="text-[11px] text-emerald-300/90 leading-relaxed">
+                    {client.firstName} {client.lastName} için astrolojik harita, numeroloji matrisi, çakra dengesi, arketip analizi, mizaç testleri ve kişiye özel dövme reçetesi eksiksiz sentezlenerek arşive güvenle kaydedilmiştir.
+                  </p>
+                  {activeDesign?.completedAt && (
+                    <span className="text-[10px] text-emerald-400/80 font-mono block pt-1">
+                      Kayıt Zamanı: {new Date(activeDesign.completedAt).toLocaleString('tr-TR')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -291,13 +291,13 @@ export function getSystemIntegrityReport(): SystemIntegrityReport {
 
   // 6. Tasarım Arşivi
   let designStatus: IntegrityState = 'Hazır';
-  let designDesc = `${designs.length} adet sürüm kontrollü tasarım arşivde korunuyor.`;
+  let designDesc = `${designs.length} adet tekil güncel tasarım kaydı sistemde korunuyor.`;
   if (rawIntegrity.hasCorruptedDesigns) {
     designStatus = 'Veri okunamadı';
     designDesc = 'Tasarım arşivinde bozuk kayıtlar tespit edildi.';
   } else if (designs.length === 0) {
     designStatus = 'Kayıt bulunmuyor';
-    designDesc = 'Tasarım arşivinde henüz sürüm kaydı bulunmuyor.';
+    designDesc = 'Tasarım arşivinde henüz aktif kayıt bulunmuyor.';
   } else if (designs.some((d) => !d.versionNumber || !d.id)) {
     designStatus = 'Eksik';
     designDesc = 'Bazı tasarım kayıtlarında sürüm numarası eksik.';

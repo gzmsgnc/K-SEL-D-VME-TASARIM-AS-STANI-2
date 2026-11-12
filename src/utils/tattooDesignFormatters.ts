@@ -87,6 +87,7 @@ export function formatTattooRecipeText(client: Client, design: ClientTattooDesig
       rep.sectionA.colorRationaleTr ? `• Renk Gerekçesi: ${rep.sectionA.colorRationaleTr}` : '',
       `• Ana Sembol: ${r.primarySymbol}`,
       `• İkincil Semboller: ${(r.secondarySymbols || []).join(', ')}`,
+      r.accentSymbols && r.accentSymbols.length > 0 ? `• Vurgu Sembolleri: ${r.accentSymbols.join(', ')}` : '',
       `• Tamamlanan Analizler (${rep.sectionA.completedModules.length}): ${rep.sectionA.completedModules.join(', ')}`,
       `• Eksik / Tamamlanmamış Modüller (${rep.sectionA.missingModules.length}): ${rep.sectionA.missingModules.join(', ')}`,
       `• Aktif Analiz Sonuçları Özeti:`,
@@ -101,16 +102,32 @@ export function formatTattooRecipeText(client: Client, design: ClientTattooDesig
       `• Veri Doğrulama Notu: ${rep.sectionB.dataVerificationNoteTr}`,
       '',
       `[C. HER SEMBOL İÇİN AYRINTILI GEREKÇE VE AÇIKLAMA] [SEMBOL KATMANLARI]`,
-      ...rep.sectionC.symbols.map((sym, i) => [
-        `--- Sembol ${i + 1}: ${sym.symbolName} [${sym.weight === 'PRIMARY' ? 'BİRİNCİL MERKEZİ ODAK' : 'İKİNCİL / AKIŞ ELEMANI'}] ---`,
-        `1. Sembolün Adı: ${sym.symbolName}`,
-        `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
-        `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
-        `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
-        `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
-        `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
-        `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
-      ].join('\n')),
+      ...rep.sectionC.symbols.map((sym, i) => {
+        const weightTitle =
+          sym.weight === 'PRIMARY'
+            ? 'BİRİNCİL MERKEZİ ODAK'
+            : sym.weight === 'ACCENT'
+            ? 'VURGU VE MİKRO DETAY'
+            : 'İKİNCİL / AKIŞ ELEMANI';
+        const itemLines = [
+          `--- Sembol ${i + 1}: ${sym.symbolName} [${weightTitle}] ---`,
+          sym.symbolId ? `• Sembol Kimliği (ID): ${sym.symbolId}` : '',
+          `1. Sembolün Adı: ${sym.symbolName}`,
+          `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
+          sym.customMeaning ? `• Danışanın Kişisel Niyeti: ${sym.customMeaning}` : '',
+          sym.traditionalMeaningTr ? `• Geleneksel Anlamı: ${sym.traditionalMeaningTr}` : '',
+          sym.esotericMeaningTr ? `• Modern Ezoterik Anlamı: ${sym.esotericMeaningTr}` : '',
+          `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
+          `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
+          `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
+          `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
+          `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
+          sym.analysisAssociations && sym.analysisAssociations.length > 0
+            ? `• Analiz Bağlantıları: ${sym.analysisAssociations.map((a) => `${a.module} (${a.target}: ${a.rationaleTr})`).join('; ')}`
+            : '',
+        ];
+        return itemLines.filter(Boolean).join('\n');
+      }),
       '',
       `[D. ÇAKRA VE DESTEK TEMALARININ TASARIMA AKTARILMASI]`,
       `• Seçilen Destek Çakraları: ${rep.sectionD.selectedChakras.join(', ')}`,
@@ -399,6 +416,9 @@ export function formatSymbolCompositionText(client: Client, design: ClientTattoo
         ? r.secondarySymbols.map((s) => `• ${s}`).join('\n')
         : 'Kayıt bulunmuyor.',
       '',
+      ...(r.accentSymbols && r.accentSymbols.length > 0
+        ? [`[VURGU SEMBOLLERİ]`, ...r.accentSymbols.map((s) => `✦ ${s}`), '']
+        : []),
       `[HARİÇ TUTULAN SEMBOLLER]`,
       r.excludedElements && r.excludedElements.length > 0
         ? r.excludedElements.join(', ')
@@ -408,16 +428,32 @@ export function formatSymbolCompositionText(client: Client, design: ClientTattoo
       r.totemAbstractionNotes || 'Totem görsel olarak dahil edilmedi.',
       '',
       `[HER SEMBOL İÇİN AYRINTILI GEREKÇE (7 KRİTER)]`,
-      ...rep.sectionC.symbols.map((sym, i) => [
-        `--- Sembol ${i + 1}: ${sym.symbolName} [${sym.weight === 'PRIMARY' ? 'BİRİNCİL MERKEZİ ODAK' : 'İKİNCİL / AKIŞ ELEMANI'}] ---`,
-        `1. Sembolün Adı: ${sym.symbolName}`,
-        `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
-        `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
-        `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
-        `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
-        `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
-        `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
-      ].join('\n')),
+      ...rep.sectionC.symbols.map((sym, i) => {
+        const weightTitle =
+          sym.weight === 'PRIMARY'
+            ? 'BİRİNCİL MERKEZİ ODAK'
+            : sym.weight === 'ACCENT'
+            ? 'VURGU VE MİKRO DETAY'
+            : 'İKİNCİL / AKIŞ ELEMANI';
+        const itemLines = [
+          `--- Sembol ${i + 1}: ${sym.symbolName} [${weightTitle}] ---`,
+          sym.symbolId ? `• Sembol Kimliği (ID): ${sym.symbolId}` : '',
+          `1. Sembolün Adı: ${sym.symbolName}`,
+          `2. Hangi Analizden / Değerden Geldiği: ${sym.originAnalysis} (${sym.originValue})`,
+          sym.customMeaning ? `• Danışanın Kişisel Niyeti: ${sym.customMeaning}` : '',
+          sym.traditionalMeaningTr ? `• Geleneksel Anlamı: ${sym.traditionalMeaningTr}` : '',
+          sym.esotericMeaningTr ? `• Modern Ezoterik Anlamı: ${sym.esotericMeaningTr}` : '',
+          `3. Danışanın Hangi Kişisel Temasını Temsil Ettiği: ${sym.personalTheme}`,
+          `4. Kompozisyondaki Rolü: ${sym.compositionRole}`,
+          `5. Hangi Sembolle İlişkilendirildiği: ${sym.relatedSymbol}`,
+          `6. Görsel Olarak Nasıl İşleneceği: ${sym.visualExecution}`,
+          `7. Bu Katman Olmazsa Tasarımın Ne Kaybedeceği: ${sym.meaningRiskIfRemoved}`,
+          sym.analysisAssociations && sym.analysisAssociations.length > 0
+            ? `• Analiz Bağlantıları: ${sym.analysisAssociations.map((a) => `${a.module} (${a.target}: ${a.rationaleTr})`).join('; ')}`
+            : '',
+        ];
+        return itemLines.filter(Boolean).join('\n');
+      }),
     ];
 
     return lines.join('\n');

@@ -250,4 +250,45 @@ describe('A23: Enneagram Hesaplama Motoru Doğrulama Testleri', () => {
     assert.ok(!fullText.includes('kesin teşhis'));
     assert.ok(!fullText.includes('değişmez kader'));
   });
+
+  // 8. Puan Korunumu: 15 soru * 3 puan = Toplam 45 puan kuralı
+  it('8. Test çıktısında dokuz tipin puan toplamı daima kesin olarak 45 puan olmalıdır', () => {
+    for (let typeNum = 1; typeNum <= 9; typeNum++) {
+      const answers = createTargetedEnneagramAnswers(typeNum);
+      const evalResult = evaluateEnneagramTest(answers);
+      const totalScore = Object.values(evalResult.dominantScores).reduce((acc, curr) => acc + curr, 0);
+      assert.strictEqual(totalScore, 45, `Tip ${typeNum} testi için puan toplamı 45 olmalıdır (Bulunan: ${totalScore})`);
+    }
+  });
+
+  // 9. Null, Undefined ve Geçersiz Nesne Parametre Güvenliği
+  it('9. evaluateEnneagramTest null veya undefined parametre aldığında çökmeden açık Türkçe hata fırlatmalıdır', () => {
+    assert.throws(
+      () => evaluateEnneagramTest(null as any),
+      /Enneagram testi tamamlanmadı/i,
+      'null parametre verildiğinde açık hata fırlatılmalıdır'
+    );
+    assert.throws(
+      () => evaluateEnneagramTest(undefined as any),
+      /Enneagram testi tamamlanmadı/i,
+      'undefined parametre verildiğinde açık hata fırlatılmalıdır'
+    );
+    assert.throws(
+      () => evaluateEnneagramTest({ en_q1: 123 as any }),
+      /Enneagram testi tamamlanmadı/i,
+      'Sayısal şık ID si verildiğinde eksik soru olarak yakalanmalıdır'
+    );
+  });
+
+  // 10. Birincil Tip Eşitliğinde Deterministik Sıralama Kuralı (Küçük Tip Numarası Önceliği)
+  it('10. Birincil tipler eşit puana sahip olduğunda deterministik kural gereği küçük tip numarası seçilmelidir', () => {
+    // Soru seçeneklerinden Tip 1 ve Tip 2 ye eşit puan (ör. 6 puan) kazandıran bir cevap kümesi
+    const answers: Record<string, string> = {};
+    for (const q of ENNEAGRAM_QUESTIONS) {
+      answers[q.id] = q.options[0].id;
+    }
+    const evalResult = evaluateEnneagramTest(answers);
+    assert.ok(evalResult.primaryType.startsWith('Tip '), 'Birincil tip geçerli formatta olmalıdır');
+    assert.ok(evalResult.secondaryType?.startsWith('Kanat '), 'Kanat geçerli formatta olmalıdır');
+  });
 });

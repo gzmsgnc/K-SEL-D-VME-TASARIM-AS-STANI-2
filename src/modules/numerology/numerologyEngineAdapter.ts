@@ -1,8 +1,9 @@
 import { Client } from '../../types/client';
 import { ClientArchiveRecord } from '../../types/archive';
-import { hasActualModuleResults } from '../../core/clientDataAdapter';
+import { NumerologyAnalysis } from '../../types/analysis';
+import { hasActualModuleResults, getSafeModuleResult } from '../../core/clientDataAdapter';
 import { NumerologyModulePreparation, CalculateNumerologyResult } from './types';
-import { calculateNumerologyMatrix } from './numerologyCalculationEngine';
+import { calculateNumerologyMatrix, isNumerologyStale } from './numerologyCalculationEngine';
 
 /**
  * Seçili danışanın Numeroloji modülüne yönelik hesaplama hazırlığını ve doğrulamasını üretir.
@@ -18,6 +19,14 @@ export function prepareNumerologyModule(
   const hasValidBirthDate = Boolean(birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate));
 
   const warnings: string[] = [];
+
+  const existingAnalysis = archive?.analyses.find((a) => a.clientId === client.id);
+  const existingNum = existingAnalysis?.numerology;
+  const isStale = existingNum ? isNumerologyStale(existingNum, client) : false;
+
+  if (isStale) {
+    warnings.push('Danışanın ad, soyad veya doğum tarihi güncellendiği için kayıtlı numeroloji analizi geçersizdir. Lütfen yeniden hesaplayınız.');
+  }
 
   if (!hasValidFullName) {
     warnings.push('Danışanın ad ve soyad bilgisi eksiktir. Kader, Ruh Arzusu ve Kişilik sayıları hesaplanamaz.');
@@ -51,8 +60,10 @@ export function prepareNumerologyModule(
       birthDate,
       hasValidFullName: true,
       hasValidBirthDate: true,
-      statusMessageTr: 'Ad-soyad ve doğum tarihi hazır. Numeroloji matrisi hesaplanabilir.',
-      warningNotices: [],
+      statusMessageTr: isStale
+        ? 'Danışan bilgileri güncellendi. Numeroloji analizinin yeniden hesaplanması gerekiyor.'
+        : 'Ad-soyad ve doğum tarihi hazır. Numeroloji matrisi hesaplanabilir.',
+      warningNotices: warnings,
     };
   }
 
@@ -110,3 +121,23 @@ export function calculateClientNumerology(
     };
   }
 }
+
+/**
+ * Bu danışana ait kayıtlı gerçek NumerologyAnalysis sonucunu çeker (varsa).
+ * Danışan kimliği uyuşmuyorsa, sonuç yoksa veya ad/soyad/doğum tarihi değiştiği için bayatsa (stale) kesinlikle null döner.
+ */
+export function getStoredNumerology(
+  archive: ClientArchiveRecord | null,
+  expectedClientId?: string
+): NumerologyAnalysis | null {
+  if (!archive || (expectedClientId && archive.client?.id !== expectedClientId)) {
+    return null;
+  }
+  const num = getSafeModuleResult<NumerologyAnalysis>(archive, 'NUMEROLOGY');
+  if (!num || !archive.client) return null;
+  if (isNumerologyStale(num, archive.client)) {
+    return null;
+  }
+  return num;
+}
+

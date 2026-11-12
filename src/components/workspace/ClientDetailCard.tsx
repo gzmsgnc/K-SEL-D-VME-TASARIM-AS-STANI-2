@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Client } from '../../types/client';
 import { ClientArchiveRecord } from '../../types/archive';
 import { useApp } from '../../store/AppContext';
+import { StorageWriteStatus, MultiStorageWriteStatus } from '../../store/storage';
 import { GlobalLocationPicker } from '../map/GlobalLocationPicker';
 import {
   Globe,
@@ -23,6 +24,7 @@ import {
   X,
   Compass,
   ArrowRight,
+  ArrowLeft,
   CheckCircle2,
   RotateCw,
   Hash,
@@ -35,6 +37,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Activity,
   History,
   Archive,
@@ -76,6 +80,7 @@ import {
   prepareNumerologyModule,
   calculateClientNumerology,
   NUMBER_RESONANCE_TABLE,
+  getStoredNumerology,
 } from '../../modules/numerology';
 import {
   prepareChakraModule,
@@ -112,6 +117,9 @@ import {
   GeometryType,
   SymbolRecommendationResult,
   VisualPromptOutput,
+  evaluateSymbolRationale,
+  evaluateCrossSymbolHarmony,
+  getDesignRoleDescription,
 } from '../../modules/symbols';
 import { ClientSymbolAnalysis } from '../../types/symbol';
 import {
@@ -122,9 +130,14 @@ import {
   TOTEM_QUESTIONS,
   ENNEAGRAM_TYPES,
   TOTEM_ANIMALS,
+  computeTotemPriorityRankings,
+  ClientTestResult,
 } from '../../modules/tests';
 import { ClientAnalysisResultsHub } from './ClientAnalysisResultsHub';
-import { ClientTattooDesignWorkflow } from './ClientTattooDesignWorkflow';
+import { ClientTattooPresentationReportSection } from './ClientTattooPresentationReportSection';
+import { ClientTattooRecipeSection } from './ClientTattooRecipeSection';
+import { ClientTattooDesignSynthesisSection } from './ClientTattooDesignSynthesisSection';
+import { canNavigateToWorkspaceTab } from '../../utils/navigationGuard';
 import { CopyButton } from '../common/CopyButton';
 import {
   formatFullClientAnalysisCopyText,
@@ -144,11 +157,13 @@ import {
 interface ClientDetailCardProps {
   client: Client;
   archive: ClientArchiveRecord | null;
+  initialTab?: DetailTab;
+  onBackToList?: () => void;
 }
 
-type DetailTab = 'RESULTS' | 'PERSONAL_BIRTH' | 'ANALYSES' | 'TESTS' | 'SYMBOLS' | 'DESIGN';
+type DetailTab = 'PERSONAL_BIRTH' | 'ANALYSES' | 'TESTS' | 'SYMBOLS' | 'RECIPE' | 'DESIGN' | 'RESULTS';
 
-export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, archive }) => {
+export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, archive, initialTab, onBackToList }) => {
   const {
     updateClient,
     deleteClient,
@@ -168,30 +183,45 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     clearClientSymbolAnalyses,
     saveClientTestResult,
     clearClientTestResult,
+    saveClientTestDraft,
+    getClientTestDraft,
+    clearClientTestDraft,
   } = useApp();
-  const [activeTab, setActiveTab] = useState<DetailTab>('PERSONAL_BIRTH');
+  const resolveTab = (tab?: DetailTab): DetailTab => {
+    if (tab === 'DESIGN' || tab === 'RESULTS') return 'RECIPE';
+    return tab || 'PERSONAL_BIRTH';
+  };
+  const [activeTab, setActiveTab] = useState<DetailTab>(() => resolveTab(initialTab));
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(resolveTab(initialTab));
+    }
+  }, [initialTab]);
+
+  const [analysesSubView, setAnalysesSubView] = useState<'CALCULATIONS' | 'RESULTS'>('CALCULATIONS');
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // A8: Hesaplama çalıştırma ve geri bildirim durumu
   const [calcLoading, setCalcLoading] = useState(false);
-  const [calcFeedback, setCalcFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [calcFeedback, setCalcFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
 
   // A12: Numeroloji hesaplama ve geri bildirim durumu
   const [numCalcLoading, setNumCalcLoading] = useState(false);
-  const [numFeedback, setNumFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [numFeedback, setNumFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
 
   // A13: Çakra hesaplama ve geri bildirim durumu
   const [chakraCalcLoading, setChakraCalcLoading] = useState(false);
-  const [chakraFeedback, setChakraFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [chakraFeedback, setChakraFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
 
   // A14: Arketip hesaplama ve geri bildirim durumu
   const [archCalcLoading, setArchCalcLoading] = useState(false);
-  const [archFeedback, setArchFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [archFeedback, setArchFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
 
   // A15: Dövme Reçetesi Motoru Durumu
   const [recipeCalcLoading, setRecipeCalcLoading] = useState(false);
-  const [recipeFeedback, setRecipeFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [recipeFeedback, setRecipeFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<TattooStyle>('SACRED_GEOMETRY');
   const [selectedPlacement, setSelectedPlacement] = useState<BodyPlacement>('FOREARM_INNER');
   const [selectedColor, setSelectedColor] = useState<TattooRecipe['colorProfile']>('MONOCHROME_BLACK');
@@ -201,32 +231,66 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   const [selectedDesignVersionId, setSelectedDesignVersionId] = useState<string | null>(null);
   const [showClearDesignsConfirm, setShowClearDesignsConfirm] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedSymbolPrompt, setCopiedSymbolPrompt] = useState(false);
 
   // A16: Sembol Kütüphanesi ve Görsel Tasarım Motoru Durumu
   const [symbolSearch, setSymbolSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<GeometryType | 'ALL'>('ALL');
+  const [isUserModifiedSymbols, setIsUserModifiedSymbols] = useState(false);
   const [selectedSymbolItems, setSelectedSymbolItems] = useState<
     { symbolId: string; symbolName: string; customMeaning: string; weight: 'PRIMARY' | 'SECONDARY' | 'ACCENT' }[]
-  >([]);
+  >(() => {
+    const clientAnalyses = archive?.symbolAnalyses?.filter((s) => s.clientId === client.id) || [];
+    const latestAnalysis = clientAnalyses.length > 0 ? clientAnalyses[clientAnalyses.length - 1] : null;
+    return (latestAnalysis?.selectedSymbols || []).map((s) => ({
+      symbolId: s.symbolId,
+      symbolName: s.symbolName,
+      customMeaning: s.customMeaning || '',
+      weight: (s.weight === 'PRIMARY' || s.weight === 'ACCENT' ? s.weight : 'SECONDARY') as 'PRIMARY' | 'SECONDARY' | 'ACCENT',
+    }));
+  });
   const [compositionNarrativeInput, setCompositionNarrativeInput] = useState('');
-  const [symbolFeedback, setSymbolFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [symbolFeedback, setSymbolFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
   const [showClearSymbolsConfirm, setShowClearSymbolsConfirm] = useState(false);
   const [generatedVisualPrompt, setGeneratedVisualPrompt] = useState<VisualPromptOutput | null>(null);
-  const [copiedSymbolPrompt, setCopiedSymbolPrompt] = useState(false);
   const [excludedSymbolsSymbolTab, setExcludedSymbolsSymbolTab] = useState('');
+  // Aşama 5.2.2: Sembol Gerekçeleri ve Kompozisyon Uyum Raporu Açılır/Kapanır Durumları
+  const [showHarmonyReport, setShowHarmonyReport] = useState(false);
+  const [expandedRationaleIds, setExpandedRationaleIds] = useState<Record<string, boolean>>({});
+  const toggleRationale = (id: string) => {
+    setExpandedRationaleIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
-  // A18: Test Sistemi (Enneagram & Totem) Durumu
+  // A18 & A69: Test Sistemi (Enneagram & Totem) ve Taslak Durumu
   const [activeTestSubTab, setActiveTestSubTab] = useState<'ENNEAGRAM' | 'ANIMAL_TOTEM'>('ENNEAGRAM');
-  const [enneagramAnswers, setEnneagramAnswers] = useState<Record<string, string>>({});
-  const [totemAnswers, setTotemAnswers] = useState<Record<string, string>>({});
-  const [enneagramActiveQIndex, setEnneagramActiveQIndex] = useState(0);
-  const [totemActiveQIndex, setTotemActiveQIndex] = useState(0);
-  const [enneagramFeedback, setEnneagramFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const [totemFeedback, setTotemFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [enneagramAnswers, setEnneagramAnswers] = useState<Record<string, string>>(() => {
+    const draft = getClientTestDraft(client.id, 'ENNEAGRAM');
+    return draft?.answers || {};
+  });
+  const [totemAnswers, setTotemAnswers] = useState<Record<string, string>>(() => {
+    const draft = getClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    return draft?.answers || {};
+  });
+  const [enneagramActiveQIndex, setEnneagramActiveQIndex] = useState<number>(() => {
+    const draft = getClientTestDraft(client.id, 'ENNEAGRAM');
+    return draft?.activeQuestionIndex ?? 0;
+  });
+  const [totemActiveQIndex, setTotemActiveQIndex] = useState<number>(() => {
+    const draft = getClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    return draft?.activeQuestionIndex ?? 0;
+  });
+  const [enneagramFeedback, setEnneagramFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
+  const [totemFeedback, setTotemFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
   const [showClearEnneagramConfirm, setShowClearEnneagramConfirm] = useState(false);
   const [showClearTotemConfirm, setShowClearTotemConfirm] = useState(false);
-  const [isEnneagramTaking, setIsEnneagramTaking] = useState(false);
-  const [isTotemTaking, setIsTotemTaking] = useState(false);
+  const [isEnneagramTaking, setIsEnneagramTaking] = useState<boolean>(() => {
+    const draft = getClientTestDraft(client.id, 'ENNEAGRAM');
+    return Boolean(draft && draft.answers && Object.keys(draft.answers).length > 0);
+  });
+  const [isTotemTaking, setIsTotemTaking] = useState<boolean>(() => {
+    const draft = getClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    return Boolean(draft && draft.answers && Object.keys(draft.answers).length > 0);
+  });
 
   // A26: Danışan Dosyası ve Dışa Aktarma Durumu
   const [showExportModal, setShowExportModal] = useState(false);
@@ -239,10 +303,14 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     targetTab?: DetailTab;
     targetLabel?: string;
   } | null>(null);
+  const [tabNavError, setTabNavError] = useState<string | null>(null);
 
   // Düzenleme durumu
   const [editData, setEditData] = useState<Client>({ ...client });
   const [editError, setEditError] = useState<string | null>(null);
+  const [profileFeedback, setProfileFeedback] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
+  const [enneagramDraftStatus, setEnneagramDraftStatus] = useState<StorageWriteStatus | MultiStorageWriteStatus | null>(null);
+  const [totemDraftStatus, setTotemDraftStatus] = useState<StorageWriteStatus | MultiStorageWriteStatus | null>(null);
 
   // Client değiştiğinde formu senkronize et
   React.useEffect(() => {
@@ -253,6 +321,10 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     setExportFeedback(null);
     setCopiedKey(null);
     setWorkflowGuidance(null);
+    setTabNavError(null);
+    setProfileFeedback(null);
+    setEnneagramDraftStatus(null);
+    setTotemDraftStatus(null);
     setCalcFeedback(null);
     setNumFeedback(null);
     setChakraFeedback(null);
@@ -261,7 +333,22 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     setSelectedDesignVersionId(null);
     setShowClearDesignsConfirm(false);
     setSymbolFeedback(null);
-    setSelectedSymbolItems([]);
+    // Yeni danışana geçildiğinde o danışanın kayıtlı sembollerini yükle ve kullanıcı düzenleme bayrağını sıfırla
+    const clientAnalyses = archive?.symbolAnalyses?.filter((s) => s.clientId === client.id) || [];
+    const latestAnalysis = clientAnalyses.length > 0 ? clientAnalyses[clientAnalyses.length - 1] : null;
+    if (latestAnalysis?.selectedSymbols && latestAnalysis.selectedSymbols.length > 0) {
+      setSelectedSymbolItems(
+        latestAnalysis.selectedSymbols.map((s) => ({
+          symbolId: s.symbolId,
+          symbolName: s.symbolName,
+          customMeaning: s.customMeaning || '',
+          weight: (s.weight === 'PRIMARY' || s.weight === 'ACCENT' ? s.weight : 'SECONDARY') as 'PRIMARY' | 'SECONDARY' | 'ACCENT',
+        }))
+      );
+    } else {
+      setSelectedSymbolItems([]);
+    }
+    setIsUserModifiedSymbols(false);
     setGeneratedVisualPrompt(null);
     setShowClearSymbolsConfirm(false);
     setExcludedSymbolsInput('');
@@ -270,16 +357,33 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     setExcludedSymbolsSymbolTab('');
     setIncludeTotemInVisual(false);
     setActiveTestSubTab('ENNEAGRAM');
-    setEnneagramAnswers({});
-    setTotemAnswers({});
-    setEnneagramActiveQIndex(0);
-    setTotemActiveQIndex(0);
+    // A69: Danışana ait taslakları yükle (Diğer danışanın taslakları kesinlikle yüklenmez)
+    const currentEnneagramDraft = getClientTestDraft(client.id, 'ENNEAGRAM');
+    if (currentEnneagramDraft && currentEnneagramDraft.answers && Object.keys(currentEnneagramDraft.answers).length > 0) {
+      setEnneagramAnswers(currentEnneagramDraft.answers);
+      setEnneagramActiveQIndex(currentEnneagramDraft.activeQuestionIndex ?? 0);
+      setIsEnneagramTaking(true);
+    } else {
+      setEnneagramAnswers({});
+      setEnneagramActiveQIndex(0);
+      setIsEnneagramTaking(false);
+    }
+
+    const currentTotemDraft = getClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    if (currentTotemDraft && currentTotemDraft.answers && Object.keys(currentTotemDraft.answers).length > 0) {
+      setTotemAnswers(currentTotemDraft.answers);
+      setTotemActiveQIndex(currentTotemDraft.activeQuestionIndex ?? 0);
+      setIsTotemTaking(true);
+    } else {
+      setTotemAnswers({});
+      setTotemActiveQIndex(0);
+      setIsTotemTaking(false);
+    }
+
     setEnneagramFeedback(null);
     setTotemFeedback(null);
     setShowClearEnneagramConfirm(false);
     setShowClearTotemConfirm(false);
-    setIsEnneagramTaking(false);
-    setIsTotemTaking(false);
   }, [client.id]);
 
   const handleCopySection = (key: string, text: string, label: string) => {
@@ -350,7 +454,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
 
   // A12: Numeroloji hazırlık ve kayıtlı sonuç
   const numPrep = prepareNumerologyModule(client, archive);
-  const storedNumerology = archive?.analyses.find((a) => a.clientId === client.id)?.numerology || null;
+  const storedNumerology = getStoredNumerology(archive, client.id);
 
   // A13: Çakra hazırlık ve kayıtlı sonuç
   const chakraPrep = prepareChakraModule(client, archive);
@@ -360,21 +464,34 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   const archPrep = prepareArchetypeModule(client, archive);
   const storedArchetype = getStoredArchetypeAnalysis(archive, client.id);
 
-  // A15 & A25: Dövme Reçetesi hazırlık ve kayıtlı tasarım sürümleri
+  // A15 & A25: Dövme Reçetesi hazırlık ve tekil güncel tasarım kaydı
   const recipePrep = prepareRecipeModule(client, archive);
   const clientDesigns = archive?.designs.filter((d) => d.clientId === client.id) || [];
   const latestDesign = clientDesigns.length > 0 ? clientDesigns[clientDesigns.length - 1] : null;
-  const activeDesign =
-    clientDesigns.find((d) => d.id === selectedDesignVersionId) || latestDesign;
-  const isViewingHistoricalVersion = Boolean(
-    activeDesign && latestDesign && activeDesign.id !== latestDesign.id
-  );
+  const activeDesign = latestDesign;
+  const isViewingHistoricalVersion = false;
 
   // A16: Sembol hazırlık ve kayıtlı analizler
   const symbolPrep = prepareSymbolModule(client, archive);
   const clientSymbolAnalyses = archive?.symbolAnalyses.filter((s) => s.clientId === client.id) || [];
   const activeSymbolAnalysis =
     clientSymbolAnalyses.length > 0 ? clientSymbolAnalyses[clientSymbolAnalyses.length - 1] : null;
+
+  // ADIM 2B: Sembol veri bütünlüğü ve seçim izolasyonu
+  // isUserModifiedSymbols true ise (kullanıcı tek tek sildiğinde veya Tümünü Temizle yaptığında)
+  // boş liste kesin son durum olarak korunur; ASLA eski arşiv kayıtlarından diriltme (fallback) yapılmaz!
+  const effectiveSelectedSymbolItems = React.useMemo(() => {
+    if (isUserModifiedSymbols) {
+      return selectedSymbolItems;
+    }
+    if (selectedSymbolItems && selectedSymbolItems.length > 0) {
+      return selectedSymbolItems;
+    }
+    if (activeSymbolAnalysis?.selectedSymbols && activeSymbolAnalysis.selectedSymbols.length > 0) {
+      return activeSymbolAnalysis.selectedSymbols;
+    }
+    return [];
+  }, [isUserModifiedSymbols, selectedSymbolItems, activeSymbolAnalysis]);
 
   // A18: Test Sistemi hazırlık ve kayıtlı sonuçlar
   const testsPrep = prepareTestsModule(client, archive);
@@ -389,6 +506,20 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       includeTotemInVisual: includeTotemInVisual,
     });
   }, [client.id, archive, excludedSymbolsSymbolTab, includeTotemInVisual]);
+
+  // Aşama 5.2.1: Kütüphane kartlarında görsel yeşil vurgu ve eşleştirme haritası
+  const recommendedSymbolMap = React.useMemo(() => {
+    const map = new Map<string, (typeof recommendedSymbolsList)[0]>();
+    for (const rec of recommendedSymbolsList) {
+      map.set(rec.symbol.id, rec);
+    }
+    return map;
+  }, [recommendedSymbolsList]);
+
+  // Aşama 5.2.2: Semboller arası kompozisyonel uyum ve sinerji değerlendirmesi
+  const crossSymbolHarmonyReport = React.useMemo(() => {
+    return evaluateCrossSymbolHarmony(recommendedSymbolsList);
+  }, [recommendedSymbolsList]);
 
   // A27: Çalışma Alanı 8 Aşamalı İş Akışı ve Durum Özeti
   const workflowSummary = React.useMemo(() => {
@@ -473,8 +604,8 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
         id: 'recipe',
         labelTr: 'Dövme reçetesi henüz oluşturulmadı.',
         descriptionTr: 'Ön analizler sonrası teknik dövme reçetesi üretilmelidir.',
-        actionText: 'Dövme Tasarımına Git',
-        targetTab: 'DESIGN',
+        actionText: 'Dövme Sunumu & Rapora Git',
+        targetTab: 'RECIPE',
       });
     }
 
@@ -488,6 +619,37 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     storedTotem,
     clientDesigns.length,
   ]);
+
+  const handleNavigateWithScroll = (tab: DetailTab) => {
+    if (tab === 'RESULTS') {
+      const check = canNavigateToWorkspaceTab('RESULTS', client, archive, activeTab, {
+        isEnneagramTaking,
+        isTotemTaking,
+      });
+      if (!check.allowed) {
+        setTabNavError(check.reasonTr || 'Bu aşamaya geçiş kısıtlanmıştır.');
+        return;
+      }
+      setTabNavError(null);
+      setActiveTab('ANALYSES');
+      setAnalysesSubView('RESULTS');
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+      return;
+    }
+
+    const target = tab === 'DESIGN' ? 'RECIPE' : tab;
+    const check = canNavigateToWorkspaceTab(target, client, archive, activeTab, {
+      isEnneagramTaking,
+      isTotemTaking,
+    });
+    if (!check.allowed) {
+      setTabNavError(check.reasonTr || 'Bu aşamaya geçiş kısıtlanmıştır.');
+      return;
+    }
+    setTabNavError(null);
+    setActiveTab(target);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
 
   const handleStepClick = (step: WorkflowStep) => {
     setWorkflowGuidance(null);
@@ -503,15 +665,41 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
         targetLabel: step.redirectTargetTab === 'ANALYSES' ? 'Analizlere Git' : 'Önceki Adıma Git',
       });
       if (step.targetTab && step.targetTab !== 'EXPORT_MODAL') {
-        setActiveTab(step.targetTab);
+        handleNavigateWithScroll(step.targetTab);
       }
       return;
     }
 
     if (step.targetTab && step.targetTab !== 'EXPORT_MODAL') {
-      setActiveTab(step.targetTab);
+      handleNavigateWithScroll(step.targetTab);
     }
   };
+
+  // Doğrulama ve Devam Et Akışı Kontrolleri
+  const isPersonalBirthValid = Boolean(
+    client.firstName?.trim() &&
+    client.lastName?.trim() &&
+    client.birthDate?.trim() &&
+    client.birthLocation?.latitude !== undefined &&
+    client.birthLocation?.longitude !== undefined
+  );
+  const missingPersonalFields: string[] = [];
+  if (!client.firstName?.trim() || !client.lastName?.trim()) missingPersonalFields.push('Ad-Soyad');
+  if (!client.birthDate?.trim()) missingPersonalFields.push('Doğum Tarihi');
+  if (client.birthLocation?.latitude === undefined || client.birthLocation?.longitude === undefined) {
+    missingPersonalFields.push('Doğum Konumu Koordinatları');
+  }
+
+  const hasAstro = Boolean(storedChart?.planetaryPositions?.length);
+  const hasNum = Boolean(storedNumerology?.lifePathNumber);
+  const hasChakra = Boolean(storedChakra?.chakras?.length);
+  const hasArch = Boolean(storedArchetype?.unifiedArchetype?.primary);
+  const isAnalysesComplete = Boolean(hasAstro && hasNum && hasChakra && hasArch);
+  const missingAnalyses: string[] = [];
+  if (!hasAstro) missingAnalyses.push('Astroloji (10 Gök Cismi)');
+  if (!hasNum) missingAnalyses.push('Numeroloji Matrisi');
+  if (!hasChakra) missingAnalyses.push('7 Temel Çakra');
+  if (!hasArch) missingAnalyses.push('Birleşik & Gölge Arketip');
 
   const handleGenerateRecipe = () => {
     setRecipeCalcLoading(true);
@@ -532,12 +720,24 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       });
 
       if (res.success && res.design) {
-        saveClientDesign(client.id, res.design);
+        const saveRes = saveClientDesign(client.id, res.design);
         setSelectedDesignVersionId(res.design.id);
-        setRecipeFeedback({
-          type: 'success',
-          message: `${res.design.title} başarıyla oluşturuldu ve arşive kaydedildi.`,
-        });
+        if (!saveRes.success) {
+          setRecipeFeedback({
+            type: 'error',
+            message: saveRes.error || 'Dövme reçetesi kaydedilemedi.',
+          });
+        } else if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+          setRecipeFeedback({
+            type: 'warning',
+            message: `${res.design.title} başarıyla oluşturuldu ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).`,
+          });
+        } else {
+          setRecipeFeedback({
+            type: 'success',
+            message: `${res.design.title} başarıyla oluşturuldu ve arşive kaydedildi.`,
+          });
+        }
       } else {
         const missingForRecipe: string[] = [];
         if (!recipePrep.hasNumerology) missingForRecipe.push('Numeroloji');
@@ -566,13 +766,25 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearDesigns = () => {
-    clearClientDesigns(client.id);
+    const res = clearClientDesigns(client.id);
     setSelectedDesignVersionId(null);
     setShowClearDesignsConfirm(false);
-    setRecipeFeedback({
-      type: 'success',
-      message: 'Bu danışana ait dövme reçeteleri sıfırlandı. Analiz verileri korundu.',
-    });
+    if (res.storageStatus === 'persisted') {
+      setRecipeFeedback({
+        type: 'success',
+        message: 'Bu danışana ait dövme reçeteleri kalıcı olarak sıfırlandı. Analiz verileri korundu.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setRecipeFeedback({
+        type: 'warning',
+        message: res.warning || 'Dövme reçeteleri oturum belleğinde temizlendi ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setRecipeFeedback({
+        type: 'error',
+        message: res.error || 'Dövme reçeteleri sıfırlanamadı.',
+      });
+    }
   };
 
   const handleCopyPrompt = (text: string) => {
@@ -605,6 +817,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       return;
     }
 
+    setIsUserModifiedSymbols(true);
     setSelectedSymbolItems((prev) => [
       ...prev,
       {
@@ -617,6 +830,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleRemoveSymbol = (symbolId: string) => {
+    setIsUserModifiedSymbols(true);
     setSelectedSymbolItems((prev) => prev.filter((s) => s.symbolId !== symbolId));
   };
 
@@ -624,12 +838,14 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
     symbolId: string,
     weight: 'PRIMARY' | 'SECONDARY' | 'ACCENT'
   ) => {
+    setIsUserModifiedSymbols(true);
     setSelectedSymbolItems((prev) =>
       prev.map((s) => (s.symbolId === symbolId ? { ...s, weight } : s))
     );
   };
 
   const handleUpdateSymbolMeaning = (symbolId: string, customMeaning: string) => {
+    setIsUserModifiedSymbols(true);
     setSelectedSymbolItems((prev) =>
       prev.map((s) => (s.symbolId === symbolId ? { ...s, customMeaning } : s))
     );
@@ -653,10 +869,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       );
 
       const res = saveClientSymbolAnalysis(client.id, analysis);
-      if (res.success) {
+      if (res.storageStatus === 'persisted') {
+        setIsUserModifiedSymbols(false);
         setSymbolFeedback({
           type: 'success',
-          message: `Sembol kompozisyonu (V${analysis.version}) başarıyla kaydedildi.`,
+          message: `Sembol kompozisyonu (V${analysis.version}) başarıyla kalıcı olarak arşivlendi.`,
+        });
+      } else if (res.storageStatus === 'memory_only') {
+        setIsUserModifiedSymbols(false);
+        setSymbolFeedback({
+          type: 'warning',
+          message: `Sembol kompozisyonu (V${analysis.version}) oturum belleğine kaydedildi (Kalıcı depolamaya yazılamadı).`,
+        });
+      } else if (res.storageStatus === 'partial_failure') {
+        setIsUserModifiedSymbols(false);
+        setSymbolFeedback({
+          type: 'warning',
+          message: res.warning || `Sembol kompozisyonu kaydedilirken kısmi depolama uyarısı alındı.`,
         });
       } else {
         setSymbolFeedback({
@@ -677,12 +906,12 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       if (!activeDesign?.recipe) {
         setWorkflowGuidance({
           message: 'Görsel istem üretmek için önce Dövme Reçetesini oluşturmanız gerekiyor.',
-          targetTab: 'DESIGN',
+          targetTab: 'RECIPE',
           targetLabel: 'Reçeteye Git',
         });
         setSymbolFeedback({
           type: 'error',
-          message: 'Eksik reçete: Görsel prompt oluşturmak için önce "Dövme Tasarımı" sekmesinden danışana özel reçete oluşturulmalıdır.',
+          message: 'Eksik reçete: Görsel prompt oluşturmak için önce "Dövme Sunumu & Rapor" sekmesinden danışana özel reçete oluşturulmalıdır.',
         });
         return;
       }
@@ -701,7 +930,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
         clientFullName: `${client.firstName} ${client.lastName}`.trim(),
         motherName: client.motherName,
         recipe: activeDesign?.recipe,
-        selectedSymbols: selectedSymbolItems,
+        selectedSymbols: effectiveSelectedSymbolItems,
         recommendedSymbols: recommendedSymbolsList.map((r) => r.symbol),
         excludedSymbols: rawExc,
         style: activeDesign?.recipe.style || selectedStyle,
@@ -727,14 +956,27 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearAllSymbols = () => {
-    clearClientSymbolAnalyses(client.id);
+    const res = clearClientSymbolAnalyses(client.id);
     setSelectedSymbolItems([]);
+    setIsUserModifiedSymbols(true);
     setGeneratedVisualPrompt(null);
     setShowClearSymbolsConfirm(false);
-    setSymbolFeedback({
-      type: 'success',
-      message: 'Bu danışana ait sembol analizleri sıfırlandı. Diğer analizler korundu.',
-    });
+    if (res.storageStatus === 'persisted') {
+      setSymbolFeedback({
+        type: 'success',
+        message: 'Bu danışana ait sembol analizleri kalıcı olarak sıfırlandı. Diğer analizler korundu.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setSymbolFeedback({
+        type: 'warning',
+        message: res.warning || 'Sembol analizleri oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setSymbolFeedback({
+        type: 'error',
+        message: res.error || 'Sembol analizleri sıfırlanamadı.',
+      });
+    }
   };
 
   const handleCopySymbolPrompt = (text: string) => {
@@ -766,9 +1008,29 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
 
     const result = updateClient(editData);
     if (result.success) {
-      setIsEditing(false);
+      if (result.storageStatus === 'persisted') {
+        setIsEditing(false);
+        setProfileFeedback({
+          type: 'success',
+          message: 'Danışan bilgileri başarıyla kalıcı depolamaya kaydedildi.',
+        });
+      } else if (result.storageStatus === 'memory_only') {
+        setIsEditing(false);
+        setProfileFeedback({
+          type: 'warning',
+          message: result.warning || 'Danışan bilgileri güncellendi fakat yalnızca oturum belleğinde tutuluyor (Kalıcı depolamaya yazılamadı).',
+        });
+      } else if (result.storageStatus === 'partial_failure') {
+        setIsEditing(false);
+        setProfileFeedback({
+          type: 'warning',
+          message: result.warning || 'Danışan bilgileri güncellenirken kısmi depolama uyarısı alındı.',
+        });
+      } else {
+        setIsEditing(false);
+      }
     } else {
-      setEditError(result.error || 'Güncelleme yapılamadı.');
+      setEditError(result.error || 'Güncelleme yapılamadı. Depolama hatası oluştu.');
     }
   };
 
@@ -804,6 +1066,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           type: 'error',
           message: saveRes.error || 'Sonuçlar arşive kaydedilemedi.',
         });
+      } else if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+        setCalcFeedback({
+          type: 'warning',
+          message: '10 gök cisminin Tropical ekliptik boylamları hesaplandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).',
+        });
       } else {
         setCalcFeedback({
           type: 'success',
@@ -821,11 +1088,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearAstrologyCalculation = () => {
-    clearClientAstrology(client.id);
-    setCalcFeedback({
-      type: 'success',
-      message: 'Danışana ait astroloji hesaplaması sıfırlandı. Modül hesaplamaya hazır durumdadır.',
-    });
+    const res = clearClientAstrology(client.id);
+    if (res.storageStatus === 'persisted') {
+      setCalcFeedback({
+        type: 'success',
+        message: 'Danışana ait astroloji hesaplaması kalıcı olarak sıfırlandı. Modül hesaplamaya hazır durumdadır.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setCalcFeedback({
+        type: 'warning',
+        message: res.warning || 'Astroloji hesaplaması oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setCalcFeedback({
+        type: 'error',
+        message: res.error || 'Astroloji hesaplaması sıfırlanamadı.',
+      });
+    }
   };
 
   const handleRunNumerologyCalculation = () => {
@@ -849,6 +1128,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           type: 'error',
           message: saveRes.error || 'Numeroloji sonuçları arşive kaydedilemedi.',
         });
+      } else if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+        setNumFeedback({
+          type: 'warning',
+          message: 'Numeroloji matrisi hesaplandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).',
+        });
       } else {
         setNumFeedback({
           type: 'success',
@@ -866,11 +1150,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearNumerologyCalculation = () => {
-    clearClientNumerology(client.id);
-    setNumFeedback({
-      type: 'success',
-      message: 'Danışana ait numeroloji matrisi sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
-    });
+    const res = clearClientNumerology(client.id);
+    if (res.storageStatus === 'persisted') {
+      setNumFeedback({
+        type: 'success',
+        message: 'Danışana ait numeroloji matrisi kalıcı olarak sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setNumFeedback({
+        type: 'warning',
+        message: res.warning || 'Numeroloji matrisi oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setNumFeedback({
+        type: 'error',
+        message: res.error || 'Numeroloji matrisi sıfırlanamadı.',
+      });
+    }
   };
 
   const handleRunChakraCalculation = () => {
@@ -894,6 +1190,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           type: 'error',
           message: saveRes.error || 'Çakra analiz sonuçları arşive kaydedilemedi.',
         });
+      } else if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+        setChakraFeedback({
+          type: 'warning',
+          message: '7 Temel Çakra dengesi hesaplandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).',
+        });
       } else {
         setChakraFeedback({
           type: 'success',
@@ -911,11 +1212,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearChakraCalculation = () => {
-    clearClientChakra(client.id);
-    setChakraFeedback({
-      type: 'success',
-      message: 'Danışana ait çakra analiz kaydı sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
-    });
+    const res = clearClientChakra(client.id);
+    if (res.storageStatus === 'persisted') {
+      setChakraFeedback({
+        type: 'success',
+        message: 'Danışana ait çakra analiz kaydı kalıcı olarak sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setChakraFeedback({
+        type: 'warning',
+        message: res.warning || 'Çakra analiz kaydı oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setChakraFeedback({
+        type: 'error',
+        message: res.error || 'Çakra analiz kaydı sıfırlanamadı.',
+      });
+    }
   };
 
   const handleRunArchetypeCalculation = () => {
@@ -939,6 +1252,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           type: 'error',
           message: saveRes.error || 'Arketip analiz sonuçları arşive kaydedilemedi.',
         });
+      } else if (saveRes.storageStatus === 'memory_only' || saveRes.storageStatus === 'partial_failure') {
+        setArchFeedback({
+          type: 'warning',
+          message: 'Birleşik Arketip ve Gölge Arketip dinamikleri hesaplandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).',
+        });
       } else {
         setArchFeedback({
           type: 'success',
@@ -956,32 +1274,65 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleClearArchetypeCalculation = () => {
-    clearClientArchetype(client.id);
-    setArchFeedback({
-      type: 'success',
-      message: 'Danışana ait arketip analiz kaydı sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
-    });
+    const res = clearClientArchetype(client.id);
+    if (res.storageStatus === 'persisted') {
+      setArchFeedback({
+        type: 'success',
+        message: 'Danışana ait arketip analiz kaydı kalıcı olarak sıfırlandı. Modül yeniden hesaplamaya hazır durumdadır.',
+      });
+    } else if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+      setArchFeedback({
+        type: 'warning',
+        message: res.warning || 'Arketip analiz kaydı oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.',
+      });
+    } else {
+      setArchFeedback({
+        type: 'error',
+        message: res.error || 'Arketip analiz kaydı sıfırlanamadı.',
+      });
+    }
   };
 
-  // A18: Test Sistemi (Enneagram & Totem) Handlers
+  // A18 & A69: Test Sistemi (Enneagram & Totem) Handlers
   const handleStartEnneagram = () => {
-    if (storedEnneagram && storedEnneagram.answers) {
+    const existingDraft = getClientTestDraft(client.id, 'ENNEAGRAM');
+    if (existingDraft && existingDraft.answers && Object.keys(existingDraft.answers).length > 0) {
+      setEnneagramAnswers(existingDraft.answers);
+      setEnneagramActiveQIndex(existingDraft.activeQuestionIndex ?? 0);
+    } else if (storedEnneagram && storedEnneagram.answers) {
       const initialMap: Record<string, string> = {};
       storedEnneagram.answers.forEach((ans) => {
         initialMap[ans.questionId] = ans.selectedOptionId;
       });
       setEnneagramAnswers(initialMap);
+      setEnneagramActiveQIndex(0);
+      const draftRes = saveClientTestDraft(client.id, 'ENNEAGRAM', initialMap, 0);
+      setEnneagramDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+    } else {
+      setEnneagramAnswers({});
+      setEnneagramActiveQIndex(0);
     }
-    setEnneagramActiveQIndex(0);
     setIsEnneagramTaking(true);
     setEnneagramFeedback(null);
   };
 
   const handleSelectEnneagramAnswer = (questionId: string, optionId: string) => {
-    setEnneagramAnswers((prev) => ({
-      ...prev,
+    const updated = {
+      ...enneagramAnswers,
       [questionId]: optionId,
-    }));
+    };
+    setEnneagramAnswers(updated);
+    const draftRes = saveClientTestDraft(client.id, 'ENNEAGRAM', updated, enneagramActiveQIndex);
+    setEnneagramDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+  };
+
+  const handleEnneagramQuestionIndexChange = (newIndex: number) => {
+    const clamped = Math.max(0, Math.min(14, newIndex));
+    setEnneagramActiveQIndex(clamped);
+    if (Object.keys(enneagramAnswers).length > 0) {
+      const draftRes = saveClientTestDraft(client.id, 'ENNEAGRAM', enneagramAnswers, clamped);
+      setEnneagramDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+    }
   };
 
   const handleCompleteEnneagramTest = () => {
@@ -990,7 +1341,12 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       const result = runAndBuildEnneagramResult(client, archive, enneagramAnswers);
       const res = saveClientTestResult(client.id, result);
       if (res.success) {
+        clearClientTestDraft(client.id, 'ENNEAGRAM');
+        setEnneagramDraftStatus(null);
+        setEnneagramAnswers({});
+        setEnneagramActiveQIndex(0);
         setIsEnneagramTaking(false);
+        let designStorageWarning = '';
         // Aktif tasarım reçetesi varsa yeni tamamlanan Enneagram sonucunu yansıtmak üzere senkronize et
         if (archive && archive.designs && archive.designs.length > 0) {
           const updatedArchive: ClientArchiveRecord = {
@@ -1002,13 +1358,28 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           };
           const recipeRes = generateClientRecipe(client, updatedArchive);
           if (recipeRes.success && recipeRes.design) {
-            saveClientDesign(client.id, recipeRes.design);
+            const desRes = saveClientDesign(client.id, recipeRes.design);
+            if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+              designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+            }
           }
         }
-        setEnneagramFeedback({
-          type: 'success',
-          message: `Enneagram testi başarıyla tamamlandı: ${result.primaryType} (${result.secondaryType || ''}) danışan arşivine kaydedildi.`,
-        });
+        if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+          setEnneagramFeedback({
+            type: 'warning',
+            message: `Enneagram testi tamamlandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).${designStorageWarning}`,
+          });
+        } else if (designStorageWarning) {
+          setEnneagramFeedback({
+            type: 'warning',
+            message: `Enneagram testi başarıyla tamamlandı: ${result.primaryType} (${result.secondaryType || ''}) danışan arşivine kaydedildi.${designStorageWarning}`,
+          });
+        } else {
+          setEnneagramFeedback({
+            type: 'success',
+            message: `Enneagram testi başarıyla tamamlandı: ${result.primaryType} (${result.secondaryType || ''}) danışan arşivine kaydedildi.`,
+          });
+        }
       } else {
         setEnneagramFeedback({
           type: 'error',
@@ -1024,11 +1395,14 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleResetEnneagram = () => {
-    clearClientTestResult(client.id, 'ENNEAGRAM');
+    const clearRes = clearClientTestResult(client.id, 'ENNEAGRAM');
+    clearClientTestDraft(client.id, 'ENNEAGRAM');
+    setEnneagramDraftStatus(null);
     setEnneagramAnswers({});
     setEnneagramActiveQIndex(0);
     setIsEnneagramTaking(false);
     setShowClearEnneagramConfirm(false);
+    let designStorageWarning = '';
     // Aktif tasarım reçetesi varsa Enneagram sıfırlanınca reçeteyi de güncel duruma (eksik Enneagram) senkronize et
     if (archive && archive.designs && archive.designs.length > 0) {
       const updatedArchive: ClientArchiveRecord = {
@@ -1037,33 +1411,76 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       };
       const recipeRes = generateClientRecipe(client, updatedArchive);
       if (recipeRes.success && recipeRes.design) {
-        saveClientDesign(client.id, recipeRes.design);
+        const desRes = saveClientDesign(client.id, recipeRes.design);
+        if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+          designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+        }
       }
     }
-    setEnneagramFeedback({
-      type: 'success',
-      message: 'Enneagram test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
-    });
+    if (clearRes.storageStatus === 'persisted') {
+      if (designStorageWarning) {
+        setEnneagramFeedback({
+          type: 'warning',
+          message: `Enneagram test kaydı sıfırlandı.${designStorageWarning}`,
+        });
+      } else {
+        setEnneagramFeedback({
+          type: 'success',
+          message: 'Enneagram test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
+        });
+      }
+    } else if (clearRes.storageStatus === 'memory_only' || clearRes.storageStatus === 'partial_failure') {
+      setEnneagramFeedback({
+        type: 'warning',
+        message: clearRes.warning || `Enneagram test kaydı oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.${designStorageWarning}`,
+      });
+    } else {
+      setEnneagramFeedback({
+        type: 'error',
+        message: clearRes.error || 'Enneagram test kaydı sıfırlanamadı.',
+      });
+    }
   };
 
   const handleStartTotem = () => {
-    if (storedTotem && storedTotem.answers) {
+    const existingDraft = getClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    if (existingDraft && existingDraft.answers && Object.keys(existingDraft.answers).length > 0) {
+      setTotemAnswers(existingDraft.answers);
+      setTotemActiveQIndex(existingDraft.activeQuestionIndex ?? 0);
+    } else if (storedTotem && storedTotem.answers) {
       const initialMap: Record<string, string> = {};
       storedTotem.answers.forEach((ans) => {
         initialMap[ans.questionId] = ans.selectedOptionId;
       });
       setTotemAnswers(initialMap);
+      setTotemActiveQIndex(0);
+      const draftRes = saveClientTestDraft(client.id, 'ANIMAL_TOTEM', initialMap, 0);
+      setTotemDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+    } else {
+      setTotemAnswers({});
+      setTotemActiveQIndex(0);
     }
-    setTotemActiveQIndex(0);
     setIsTotemTaking(true);
     setTotemFeedback(null);
   };
 
   const handleSelectTotemAnswer = (questionId: string, optionId: string) => {
-    setTotemAnswers((prev) => ({
-      ...prev,
+    const updated = {
+      ...totemAnswers,
       [questionId]: optionId,
-    }));
+    };
+    setTotemAnswers(updated);
+    const draftRes = saveClientTestDraft(client.id, 'ANIMAL_TOTEM', updated, totemActiveQIndex);
+    setTotemDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+  };
+
+  const handleTotemQuestionIndexChange = (newIndex: number) => {
+    const clamped = Math.max(0, Math.min(9, newIndex));
+    setTotemActiveQIndex(clamped);
+    if (Object.keys(totemAnswers).length > 0) {
+      const draftRes = saveClientTestDraft(client.id, 'ANIMAL_TOTEM', totemAnswers, clamped);
+      setTotemDraftStatus(draftRes.storageStatus || (draftRes.success ? 'persisted' : 'failed'));
+    }
   };
 
   const handleCompleteTotemTest = () => {
@@ -1072,7 +1489,12 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       const result = runAndBuildTotemResult(client, archive, totemAnswers);
       const res = saveClientTestResult(client.id, result);
       if (res.success) {
+        clearClientTestDraft(client.id, 'ANIMAL_TOTEM');
+        setTotemDraftStatus(null);
+        setTotemAnswers({});
+        setTotemActiveQIndex(0);
         setIsTotemTaking(false);
+        let designStorageWarning = '';
         // Aktif tasarım reçetesi varsa yeni tamamlanan totem sonucunu yansıtmak üzere senkronize et
         if (archive && archive.designs && archive.designs.length > 0) {
           const updatedArchive: ClientArchiveRecord = {
@@ -1084,13 +1506,28 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           };
           const recipeRes = generateClientRecipe(client, updatedArchive);
           if (recipeRes.success && recipeRes.design) {
-            saveClientDesign(client.id, recipeRes.design);
+            const desRes = saveClientDesign(client.id, recipeRes.design);
+            if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+              designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+            }
           }
         }
-        setTotemFeedback({
-          type: 'success',
-          message: `Hayvan Totemi testi başarıyla tamamlandı: ${result.primaryType} (${TOTEM_ANIMALS[result.primaryType]?.elementTr || ''}) danışan arşivine kaydedildi.`,
-        });
+        if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+          setTotemFeedback({
+            type: 'warning',
+            message: `Hayvan Totemi testi tamamlandı ancak tarayıcı depolama alanına yazılamadı (Yalnızca geçici oturum belleğinde tutuluyor; sayfa yenilendiğinde kaybolabilir).${designStorageWarning}`,
+          });
+        } else if (designStorageWarning) {
+          setTotemFeedback({
+            type: 'warning',
+            message: `Hayvan Totemi testi başarıyla tamamlandı: ${result.primaryType} (${TOTEM_ANIMALS[result.primaryType]?.elementTr || ''}) danışan arşivine kaydedildi.${designStorageWarning}`,
+          });
+        } else {
+          setTotemFeedback({
+            type: 'success',
+            message: `Hayvan Totemi testi başarıyla tamamlandı: ${result.primaryType} (${TOTEM_ANIMALS[result.primaryType]?.elementTr || ''}) danışan arşivine kaydedildi.`,
+          });
+        }
       } else {
         setTotemFeedback({
           type: 'error',
@@ -1106,11 +1543,14 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
   };
 
   const handleResetTotem = () => {
-    clearClientTestResult(client.id, 'ANIMAL_TOTEM');
+    const clearRes = clearClientTestResult(client.id, 'ANIMAL_TOTEM');
+    clearClientTestDraft(client.id, 'ANIMAL_TOTEM');
+    setTotemDraftStatus(null);
     setTotemAnswers({});
     setTotemActiveQIndex(0);
     setIsTotemTaking(false);
     setShowClearTotemConfirm(false);
+    let designStorageWarning = '';
     // Aktif tasarım reçetesi varsa Totem sıfırlanınca reçeteyi de güncel duruma (eksik Totem) senkronize et
     if (archive && archive.designs && archive.designs.length > 0) {
       const updatedArchive: ClientArchiveRecord = {
@@ -1119,13 +1559,145 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
       };
       const recipeRes = generateClientRecipe(client, updatedArchive);
       if (recipeRes.success && recipeRes.design) {
-        saveClientDesign(client.id, recipeRes.design);
+        const desRes = saveClientDesign(client.id, recipeRes.design);
+        if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+          designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+        }
       }
     }
-    setTotemFeedback({
-      type: 'success',
-      message: 'Hayvan Totemi test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
-    });
+    if (clearRes.storageStatus === 'persisted') {
+      if (designStorageWarning) {
+        setTotemFeedback({
+          type: 'warning',
+          message: `Hayvan Totemi test kaydı sıfırlandı.${designStorageWarning}`,
+        });
+      } else {
+        setTotemFeedback({
+          type: 'success',
+          message: 'Hayvan Totemi test kaydı sıfırlandı. Diğer testler ve analizler korunmuştur.',
+        });
+      }
+    } else if (clearRes.storageStatus === 'memory_only' || clearRes.storageStatus === 'partial_failure') {
+      setTotemFeedback({
+        type: 'warning',
+        message: clearRes.warning || `Hayvan Totemi test kaydı oturum belleğinde sıfırlandı ancak kalıcı depolamaya yazılamadı.${designStorageWarning}`,
+      });
+    } else {
+      setTotemFeedback({
+        type: 'error',
+        message: clearRes.error || 'Hayvan Totemi test kaydı sıfırlanamadı.',
+      });
+    }
+  };
+
+  const handleSelectTotemForDesign = (animalName: string) => {
+    if (!storedTotem) return;
+    const currentRejected = storedTotem.rejectedTotemAnimals || [];
+    const updatedRejected = currentRejected.filter((a) => a !== animalName);
+    const updatedTotem: ClientTestResult = {
+      ...storedTotem,
+      selectedTotemAnimal: animalName,
+      rejectedTotemAnimals: updatedRejected,
+    };
+    const res = saveClientTestResult(client.id, updatedTotem);
+    if (res.success) {
+      let designStorageWarning = '';
+      if (archive && archive.designs && archive.designs.length > 0) {
+        const updatedArchive: ClientArchiveRecord = {
+          ...archive,
+          testResults: [
+            ...(archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ANIMAL_TOTEM')),
+            updatedTotem,
+          ],
+        };
+        const recipeRes = generateClientRecipe(client, updatedArchive);
+        if (recipeRes.success && recipeRes.design) {
+          const desRes = saveClientDesign(client.id, recipeRes.design);
+          if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+            designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+          }
+        }
+      }
+      if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+        setTotemFeedback({
+          type: 'warning',
+          message: `${animalName} seçildi ancak veriler oturum belleğinde tutuluyor.${designStorageWarning}`,
+        });
+      } else if (designStorageWarning) {
+        setTotemFeedback({
+          type: 'warning',
+          message: `${animalName} danışan onayıyla dövme tasarımı için seçildi.${designStorageWarning}`,
+        });
+      } else {
+        setTotemFeedback({
+          type: 'success',
+          message: `${animalName} danışan onayıyla dövme tasarımı için seçildi. Dövme reçetesi güncellendi.`,
+        });
+      }
+    } else {
+      setTotemFeedback({
+        type: 'error',
+        message: res.error || 'Totem seçimi kaydedilemedi.',
+      });
+    }
+  };
+
+  const handleRejectTotemAnimal = (animalName: string) => {
+    if (!storedTotem) return;
+    const currentRejected = storedTotem.rejectedTotemAnimals || [];
+    const nextRejected = currentRejected.includes(animalName) ? currentRejected : [...currentRejected, animalName];
+
+    // Sıradaki reddedilmemiş alternatif hayvanı bul
+    const rankings = storedTotem.totemPriorityRankings || [];
+    const nextCandidate = rankings.find((item) => !nextRejected.includes(item.animal));
+    const nextAnimalName = nextCandidate?.animal;
+
+    const updatedTotem: ClientTestResult = {
+      ...storedTotem,
+      selectedTotemAnimal: nextAnimalName,
+      rejectedTotemAnimals: nextRejected,
+    };
+    const res = saveClientTestResult(client.id, updatedTotem);
+    if (res.success) {
+      let designStorageWarning = '';
+      if (archive && archive.designs && archive.designs.length > 0) {
+        const updatedArchive: ClientArchiveRecord = {
+          ...archive,
+          testResults: [
+            ...(archive.testResults || []).filter((t) => !(t.clientId === client.id && t.testType === 'ANIMAL_TOTEM')),
+            updatedTotem,
+          ],
+        };
+        const recipeRes = generateClientRecipe(client, updatedArchive);
+        if (recipeRes.success && recipeRes.design) {
+          const desRes = saveClientDesign(client.id, recipeRes.design);
+          if (desRes.storageStatus === 'memory_only' || desRes.storageStatus === 'partial_failure') {
+            designStorageWarning = ' [Bağlı dövme tasarımı yalnızca oturum belleğinde güncellendi]';
+          }
+        }
+      }
+      if (res.storageStatus === 'memory_only' || res.storageStatus === 'partial_failure') {
+        setTotemFeedback({
+          type: 'warning',
+          message: `${animalName} reddedildi, ancak veriler yalnızca oturum belleğinde saklandı (sayfa yenilenirse kaybolabilir).${designStorageWarning}`,
+        });
+      } else if (designStorageWarning) {
+        setTotemFeedback({
+          type: 'warning',
+          message: `${animalName} reddedildi. Sıradaki alternatif (${nextAnimalName || 'Alternatif kalmadı'}) devreye alındı.${designStorageWarning}`,
+        });
+      } else {
+        setTotemFeedback({
+          type: 'success',
+          message: `${animalName} reddedildi. Sıradaki alternatif (${nextAnimalName || 'Alternatif kalmadı'}) devreye alındı.`,
+        });
+      }
+    } else {
+      setTotemFeedback({
+        type: 'error',
+        message: res.error || 'İşlem kaydedilemedi.',
+      });
+    }
   };
 
   return (
@@ -1219,427 +1791,239 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
         </div>
       </div>
 
-      {/* A27: 1. Çalışma Alanı Durum Özeti Kartı */}
+      {/* SADE VE ZARİF TEKİL İLERLEME GÖSTERGESİ & 6 ANA BÖLÜM NAVİGASYONU */}
       {workflowSummary && (
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-800/80">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                <Activity className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-stone-100 flex items-center gap-2">
-                  <span>Çalışma Alanı Durum Özeti</span>
-                </h3>
-                <p className="text-[11px] text-stone-400">
-                  {workflowSummary.birthInfoTr}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 self-start sm:self-center">
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-stone-950 border border-stone-800 text-stone-300">
-                {workflowSummary.overallStatusLabelTr}
-              </span>
-              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                %{workflowSummary.overallProgressPercent}
-              </span>
-            </div>
-          </div>
-
-          {/* Genel İlerleme Çubuğu */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-stone-400">İş Akışı İlerleme Durumu</span>
-              <span className="font-mono text-amber-400/90 font-medium">
-                {workflowSummary.steps.filter((s) => s.status === 'COMPLETED').length} / 8 Aşama Tamamlandı
-              </span>
-            </div>
-            <div className="w-full h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-800/60 p-0.5">
-              <div
-                className="h-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-300 rounded-full transition-all duration-500"
-                style={{ width: `${workflowSummary.overallProgressPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Özet Metrikleri (4 Kolon) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
-            {/* Metrik 1: Danışan & Doğum */}
-            <div className="p-3 rounded-lg bg-stone-950/60 border border-stone-800/70 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Danışan Kaydı</span>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-1.5 py-0.2 rounded">
-                  Aktif
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-stone-200 truncate">
-                {client.firstName} {client.lastName}
-              </div>
-              <div className="text-[10px] text-stone-400 truncate">
-                {client.isBirthTimeUnknown ? 'Doğum saati belirsiz' : `Saat ${client.birthTime}`} · {client.birthLocation?.city || 'Konum Belirtildi'}
-              </div>
-            </div>
-
-            {/* Metrik 2: Temel Analizler */}
-            <div className="p-3 rounded-lg bg-stone-950/60 border border-stone-800/70 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Temel Analizler</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                    workflowSummary.completedAnalysesCount === 4
-                      ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60'
-                      : workflowSummary.completedAnalysesCount > 0
-                      ? 'bg-amber-950/50 text-amber-300 border-amber-800/60'
-                      : 'bg-stone-900 text-stone-500 border-stone-800'
-                  }`}
-                >
-                  {workflowSummary.completedAnalysesCount > 0 ? workflowSummary.analysesStatusTr : 'Kayıt bulunmuyor'}
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-stone-200">
-                {workflowSummary.completedAnalysesCount === 4
-                  ? 'Tüm Analizler Hazır'
-                  : workflowSummary.completedAnalysesCount > 0
-                  ? `${workflowSummary.completedAnalysesCount} / 4 Analiz`
-                  : 'Kayıt bulunmuyor'}
-              </div>
-              <div className="text-[10px] text-stone-400 truncate">
-                Astroloji, Numeroloji, Çakra, Arketip
-              </div>
-            </div>
-
-            {/* Metrik 3: Psikoloji & Testler */}
-            <div className="p-3 rounded-lg bg-stone-950/60 border border-stone-800/70 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Test Sistemi</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                    workflowSummary.completedTestsCount === 2
-                      ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60'
-                      : workflowSummary.completedTestsCount === 1
-                      ? 'bg-amber-950/50 text-amber-300 border-amber-800/60'
-                      : 'bg-stone-900 text-stone-500 border-stone-800'
-                  }`}
-                >
-                  {workflowSummary.completedTestsCount > 0 ? workflowSummary.testsStatusTr : 'Kayıt bulunmuyor'}
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-stone-200">
-                {workflowSummary.completedTestsCount === 2
-                  ? 'Enneagram & Totem'
-                  : workflowSummary.completedTestsCount === 1
-                  ? '1 Test Tamamlandı'
-                  : 'Kayıt bulunmuyor'}
-              </div>
-              <div className="text-[10px] text-stone-400 truncate">
-                15 Mizaç + 10 Totem Sorusu
-              </div>
-            </div>
-
-            {/* Metrik 4: Reçete & Sürümler */}
-            <div className="p-3 rounded-lg bg-stone-950/60 border border-stone-800/70 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">Reçete & Sürüm</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
-                    workflowSummary.totalDesignsCount > 0
-                      ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60'
-                      : 'bg-stone-900 text-stone-500 border-stone-800'
-                  }`}
-                >
-                  {workflowSummary.totalDesignsCount > 0 ? workflowSummary.currentRecipeVersionTr : 'Kayıt bulunmuyor'}
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-stone-200">
-                {workflowSummary.totalDesignsCount > 0
-                  ? `${workflowSummary.totalDesignsCount} Kayıtlı Tasarım`
-                  : 'Kayıt bulunmuyor'}
-              </div>
-              <div className="text-[10px] text-stone-400 truncate">
-                Tasarım Sürüm Arşivi
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* A27: 2. Çalışma Alanı İlerleme Akışı (8-Aşamalı Stepper Bar) */}
-      {workflowSummary && (
-        <div className="bg-stone-900/60 border border-stone-800 rounded-xl p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs font-semibold text-stone-200 uppercase tracking-wider">
-                Çalışma Alanı İlerleme Akışı
-              </h3>
-            </div>
-            <span className="text-[11px] text-stone-400">
-              Aşamalara tıklayarak doğrudan ilgili adıma geçebilirsiniz
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            {workflowSummary.steps.map((step) => {
-              const isSelectedTab =
-                (step.targetTab === 'PERSONAL_BIRTH' && activeTab === 'PERSONAL_BIRTH') ||
-                (step.targetTab === 'ANALYSES' && activeTab === 'ANALYSES') ||
-                (step.targetTab === 'TESTS' && activeTab === 'TESTS') ||
-                (step.targetTab === 'SYMBOLS' && activeTab === 'SYMBOLS') ||
-                (step.targetTab === 'DESIGN' && activeTab === 'DESIGN') ||
-                (step.targetTab === 'RESULTS' && activeTab === 'RESULTS');
-
-              const isCompleted = step.status === 'COMPLETED';
-              const isMissing = step.status === 'MISSING';
-              const isReady = step.status === 'READY';
-
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  onClick={() => handleStepClick(step)}
-                  className={`p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
-                    isSelectedTab
-                      ? 'ring-1 ring-amber-400/60 border-amber-500/60 bg-stone-900 shadow-sm'
-                      : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
-                  }`}
-                  title={`${step.title} — ${step.statusLabelTr}: ${step.summaryTr}`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="w-4 h-4 rounded-full bg-stone-800 text-[10px] font-mono flex items-center justify-center text-stone-300">
-                      {step.order}
-                    </span>
-                    <span
-                      className={`text-[9px] font-mono px-1 py-0.2 rounded border shrink-0 ${
-                        isCompleted
-                          ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
-                          : isReady
-                          ? 'bg-amber-950/60 border-amber-800/80 text-amber-300'
-                          : isMissing
-                          ? 'bg-rose-950/60 border-rose-800/80 text-rose-300'
-                          : 'bg-stone-900 border-stone-800 text-stone-500'
-                      }`}
-                    >
-                      {step.statusLabelTr}
-                    </span>
-                  </div>
-
-                  <div>
-                    <div className={`text-[11px] font-medium truncate ${isSelectedTab ? 'text-amber-300' : 'text-stone-200'}`}>
-                      {step.title}
-                    </div>
-                    <div className="text-[9px] text-stone-500 line-clamp-1 mt-0.5">
-                      {step.summaryTr}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* A34: Eksik Adımları Tek Yerden Yönetme Paneli */}
-      {missingActionSteps.length > 0 && (
-        <div className="bg-stone-900/80 border border-stone-800 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-semibold text-stone-200 uppercase tracking-wider">
-                Eksik Adımları Yönet ({missingActionSteps.length} Eksik İşlem)
-              </h4>
-            </div>
-            <span className="text-[11px] text-stone-400">
-              Tek tıkla ilgili analize veya teste geçebilirsiniz
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {missingActionSteps.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg flex items-center justify-between gap-3 text-xs"
-              >
-                <div className="space-y-0.5 truncate">
-                  <div className="font-semibold text-rose-300 truncate">
-                    {item.labelTr}
-                  </div>
-                  <div className="text-[10px] text-stone-400 truncate">
-                    {item.descriptionTr}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(item.targetTab);
-                    if (item.onAction) item.onAction();
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{item.actionText}</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* A27: 3. Eksik Adım Yönlendirme Bildirimi */}
-      {workflowGuidance && (
-        <div className="bg-amber-950/40 border border-amber-800/80 text-amber-200 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-in fade-in duration-200">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
             <div>
-              <div className="text-xs font-semibold text-amber-200">Eksik Adım Yönlendirmesi</div>
-              <p className="text-xs text-amber-300/90 mt-0.5">{workflowGuidance.message}</p>
+              <h3 className="text-sm font-semibold text-stone-100 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-amber-400" />
+                <span>Danışan İlerleme Durumu</span>
+              </h3>
+              <p className="text-xs text-stone-400 mt-0.5">
+                {workflowSummary.birthInfoTr}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                %{workflowSummary.overallProgressPercent} Tamamlandı
+              </span>
+              <span className="text-xs text-stone-400">
+                {[
+                  isPersonalBirthValid,
+                  isAnalysesComplete,
+                  Boolean(storedEnneagram?.primaryType && storedTotem?.primaryType),
+                  Boolean(effectiveSelectedSymbolItems.length > 0),
+                  Boolean(activeDesign?.recipe),
+                  Boolean(activeDesign?.aiPrompt?.primaryPromptEn),
+                ].filter(Boolean).length} / 6 Bölüm
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            {workflowGuidance.targetTab && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (workflowGuidance.targetTab) {
-                    setActiveTab(workflowGuidance.targetTab);
-                  }
-                  setWorkflowGuidance(null);
-                }}
-                className="px-3 py-1.5 text-xs font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <span>{workflowGuidance.targetLabel || 'İlgili Adıma Git'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+          {/* İlerleme Çubuğu */}
+          <div className="w-full h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-800/80 p-0.5">
+            <div
+              className="h-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-300 rounded-full transition-all duration-500"
+              style={{ width: `${workflowSummary.overallProgressPercent}%` }}
+            />
+          </div>
+
+          {/* 5 Ana Bölüm Sekmesi (Tıklanabilir Serbest Navigasyon) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1 text-xs">
+            {/* 1. Danışanlar */}
             <button
               type="button"
-              onClick={() => setWorkflowGuidance(null)}
-              className="p-1.5 text-amber-400/80 hover:text-amber-200 rounded-lg transition-colors cursor-pointer"
-              title="Kapat"
+              onClick={() => handleNavigateWithScroll('PERSONAL_BIRTH')}
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                activeTab === 'PERSONAL_BIRTH'
+                  ? 'ring-1 ring-amber-400/80 border-amber-500/80 bg-stone-800 shadow-md'
+                  : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
+              }`}
             >
-              <X className="w-4 h-4" />
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5 font-medium text-stone-200">
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span>1. Danışanlar</span>
+                </span>
+                {isPersonalBirthValid ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-rose-500/80" />
+                )}
+              </div>
+              <div className="text-[10px] text-stone-400 truncate">
+                {client.firstName} {client.lastName}
+              </div>
+            </button>
+
+            {/* 2. Analiz */}
+            <button
+              type="button"
+              onClick={() => handleNavigateWithScroll('ANALYSES')}
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                activeTab === 'ANALYSES'
+                  ? 'ring-1 ring-amber-400/80 border-amber-500/80 bg-stone-800 shadow-md'
+                  : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5 font-medium text-stone-200">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>2. Analiz</span>
+                </span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                    isAnalysesComplete
+                      ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                      : 'bg-stone-900 border-stone-800 text-stone-400'
+                  }`}
+                >
+                  {[hasAstro, hasNum, hasChakra, hasArch].filter(Boolean).length}/4
+                </span>
+              </div>
+              <div className="text-[10px] text-stone-400 truncate">
+                Astro, Num, Çakra, Arketip
+              </div>
+            </button>
+
+            {/* 3. Testler */}
+            <button
+              type="button"
+              onClick={() => handleNavigateWithScroll('TESTS')}
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                activeTab === 'TESTS'
+                  ? 'ring-1 ring-amber-400/80 border-amber-500/80 bg-stone-800 shadow-md'
+                  : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5 font-medium text-stone-200">
+                  <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                  <span>3. Testler</span>
+                </span>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                    storedEnneagram?.primaryType && storedTotem?.primaryType
+                      ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                      : 'bg-stone-900 border-stone-800 text-stone-400'
+                  }`}
+                >
+                  {[Boolean(storedEnneagram?.primaryType), Boolean(storedTotem?.primaryType)].filter(Boolean).length}/2
+                </span>
+              </div>
+              <div className="text-[10px] text-stone-400 truncate">
+                Enneagram & Hayvan Totemi
+              </div>
+            </button>
+
+            {/* 4. Sembol Kütüphanesi */}
+            <button
+              type="button"
+              onClick={() => handleNavigateWithScroll('SYMBOLS')}
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                activeTab === 'SYMBOLS'
+                  ? 'ring-1 ring-amber-400/80 border-amber-500/80 bg-stone-800 shadow-md'
+                  : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5 font-medium text-stone-200">
+                  <Shapes className="w-3.5 h-3.5 text-amber-400" />
+                  <span>4. Sembol Kütüphanesi</span>
+                </span>
+                {effectiveSelectedSymbolItems.length > 0 ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <span className="text-[10px] text-stone-500 font-mono">0</span>
+                )}
+              </div>
+              <div className="text-[10px] text-stone-400 truncate">
+                Katalog, Öneriler & Seçim
+              </div>
+            </button>
+
+            {/* 5. Dövme Sunumu & Rapor */}
+            <button
+              type="button"
+              onClick={() => handleNavigateWithScroll('RECIPE')}
+              className={`p-3 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                activeTab === 'RECIPE' || activeTab === 'DESIGN'
+                  ? 'ring-1 ring-amber-400/80 border-amber-500/80 bg-stone-800 shadow-md'
+                  : 'border-stone-800 bg-stone-950/70 hover:border-stone-700 hover:bg-stone-900/60'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1.5 font-medium text-stone-200">
+                  <Palette className="w-3.5 h-3.5 text-amber-400" />
+                  <span>5. Dövme Sunumu & Rapor</span>
+                </span>
+                {activeDesign?.aiPrompt?.primaryPromptEn ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                ) : activeDesign?.recipe ? (
+                  <span className="text-[10px] text-amber-400 font-mono">Reçete Hazır</span>
+                ) : (
+                  <span className="text-[10px] text-stone-500 font-mono">-</span>
+                )}
+              </div>
+              <div className="text-[10px] text-stone-400 truncate">
+                Reçete, Prompt & 10 Bölümlü Rapor
+              </div>
             </button>
           </div>
+
+          {/* Bilgilendirme Uyarısı (Varsa, Kapatılabilir) */}
+          {tabNavError && (
+            <div className="p-3 bg-rose-950/40 border border-rose-800/80 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 shadow-lg animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{tabNavError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTabNavError(null)}
+                className="text-stone-400 hover:text-white p-1 rounded cursor-pointer shrink-0"
+                title="Kapat"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* 2. Bölüm Sekmeleri (Tab Bar) - Kesintisiz Danışan Akış Sırası */}
-      <div className="flex items-center gap-1 p-1 bg-stone-900/60 border border-stone-800 rounded-lg overflow-x-auto text-xs">
-        <button
-          type="button"
-          onClick={() => setActiveTab('PERSONAL_BIRTH')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'PERSONAL_BIRTH'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <User className="w-3.5 h-3.5" />
-          <span>1. Danışan Bilgileri</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('ANALYSES')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'ANALYSES'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>2. Temel Analizler</span>
-          <span className="text-[10px] text-stone-500 font-mono">({archive?.analyses.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('TESTS')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'TESTS'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <ClipboardList className="w-3.5 h-3.5" />
-          <span>3. Enneagram & Totem</span>
-          <span className="text-[10px] text-stone-500 font-mono">({(archive?.testResults.length || 0) + (storedArchetype ? 1 : 0)})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('RESULTS')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'RESULTS'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <Compass className="w-3.5 h-3.5" />
-          <span>4. Analiz Sonuçları</span>
-          <span className="text-[10px] text-stone-500 font-mono">
-            ({[
-              Boolean(storedChart?.planetaryPositions?.length),
-              Boolean(storedNumerology?.lifePathNumber),
-              Boolean(storedChakra?.chakras?.length),
-              Boolean(storedArchetype?.unifiedArchetype?.primary),
-              Boolean(storedEnneagram?.primaryType),
-              Boolean(storedTotem?.primaryType),
-            ].filter(Boolean).length}/6)
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('SYMBOLS')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'SYMBOLS'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <Shapes className="w-3.5 h-3.5" />
-          <span>Semboller</span>
-          <span className="text-[10px] text-stone-500 font-mono">({archive?.symbolAnalyses.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('DESIGN')}
-          className={`px-3.5 py-2 font-medium rounded-md transition-colors flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'DESIGN'
-              ? 'bg-stone-800 text-amber-300 shadow-sm border border-stone-700'
-              : 'text-stone-400 hover:text-stone-200'
-          }`}
-        >
-          <Palette className="w-3.5 h-3.5" />
-          <span>Dövme Tasarımı</span>
-          <span className="text-[10px] text-stone-500 font-mono">({archive?.designs.length || 0})</span>
-        </button>
-      </div>
-
-      {/* 3. SEKME İÇERİKLERİ */}
-
-      {/* SEKME 0: ANALİZ SONUÇLARI MERKEZİ (A28) */}
-      {activeTab === 'RESULTS' && (
-        <ClientAnalysisResultsHub
-          client={client}
-          archive={archive}
-          onNavigateToTab={(tab) => {
-            if (tab === 'EXPORT') {
-              setShowExportModal(true);
-            } else {
-              setActiveTab(tab);
-            }
-          }}
-        />
       )}
 
       {/* SEKME 1: KİŞİSEL & DOĞUM BİLGİLERİ */}
       {activeTab === 'PERSONAL_BIRTH' && (
-        isEditing ? (
+        <div className="space-y-4">
+          {profileFeedback && (
+            <div
+              className={`p-3.5 rounded-xl text-xs flex items-center justify-between gap-3 border shadow-md animate-in fade-in duration-200 ${
+                profileFeedback.type === 'success'
+                  ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
+                  : profileFeedback.type === 'error'
+                  ? 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+                  : 'bg-amber-950/40 border-amber-800/80 text-amber-300'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {profileFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertTriangle className={`w-4 h-4 shrink-0 ${profileFeedback.type === 'error' ? 'text-rose-400' : 'text-amber-400'}`} />
+                )}
+                <span>{profileFeedback.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileFeedback(null)}
+                className="text-stone-400 hover:text-stone-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {isEditing ? (
           /* Düzenleme Formu */
           <form onSubmit={handleSaveEdit} className="bg-stone-900/60 border border-stone-800 rounded-xl p-5 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-stone-800">
@@ -1931,29 +2315,113 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                   title="Danışanın kimlik ve iletişim bilgilerini panoya kopyalar"
                 />
               </div>
+
+              {/* AŞAMA 1 DEVAM ET BUTONU VE DOĞRULAMA ALANI */}
+              <div className="mt-4 p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-3 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-stone-200">
+                        Sıradaki Aşama: 2. Temel Analizler
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                          isPersonalBirthValid
+                            ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                            : 'bg-amber-950/60 border-amber-800 text-amber-300'
+                        }`}
+                      >
+                        {isPersonalBirthValid ? 'Bilgiler Doğrulandı ✓' : 'Eksik Alanlar Mevcut'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-400">
+                      {isPersonalBirthValid
+                        ? 'Danışan kimliği, doğum tarihi ve global harita koordinatları eksiksiz doğrulandı.'
+                        : `Devam etmek için lütfen eksik alanları (${missingPersonalFields.join(', ')}) tamamlayınız.`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateWithScroll('ANALYSES')}
+                      disabled={!isPersonalBirthValid}
+                      className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-md shadow-amber-950/30"
+                    >
+                      <span>Devam Et: Temel Analizlere Geç</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {!isPersonalBirthValid && (
+                  <div className="p-2.5 bg-rose-950/30 border border-rose-800/60 rounded-lg text-xs text-rose-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>
+                      <strong>Uyarı:</strong> {missingPersonalFields.join(', ')} olmadan astroloji ve numeroloji analizleri hesaplanamaz. Lütfen yukarıdaki &quot;Düzenle&quot; butonuyla bilgileri giriniz.
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        )
+        )}
+        </div>
       )}
 
-      {/* SEKME 2: ANALİZLER (Batı Astroloji Temeli ve Diğer Modüller) */}
-      {activeTab === 'ANALYSES' && (
+      {/* SEKME 2: ANALİZ (Temel Analizler ve Analiz Sonuçları Birleşik Bölümü) */}
+      {(activeTab === 'ANALYSES' || activeTab === 'RESULTS') && (
         <div className="space-y-4">
-          {/* A28: Sonuçlar Merkezi Hızlı Bağlantısı */}
-          <div className="bg-stone-900/40 border border-stone-800/80 rounded-xl p-3 px-4 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-stone-300">
-              <Compass className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Tüm analiz ve test sonuçlarını 6 bağımsız kart halinde incelemek için:</span>
+          {/* Analiz Alt Görünüm Seçici */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 bg-stone-900/80 border border-stone-800 rounded-xl">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAnalysesSubView('CALCULATIONS')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  analysesSubView === 'CALCULATIONS'
+                    ? 'bg-amber-400 text-stone-950 font-semibold shadow-sm'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Analiz Hesaplamaları & Detaylar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAnalysesSubView('RESULTS')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  analysesSubView === 'RESULTS'
+                    ? 'bg-amber-400 text-stone-950 font-semibold shadow-sm'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Kapsamlı Analiz Sonuç Kartları</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveTab('RESULTS')}
-              className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg font-medium transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              <span>Sonuçlar Merkezi</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+
+            <div className="flex items-center gap-2 pr-2 text-xs text-stone-400">
+              <span className="text-[11px] font-mono">
+                Hesaplanan: {[hasAstro, hasNum, hasChakra, hasArch].filter(Boolean).length}/4
+              </span>
+            </div>
           </div>
+
+          {analysesSubView === 'RESULTS' ? (
+            <ClientAnalysisResultsHub
+              client={client}
+              archive={archive}
+              onNavigateToTab={(tab) => {
+                if (tab === 'EXPORT') {
+                  setShowExportModal(true);
+                } else {
+                  handleNavigateWithScroll(tab);
+                }
+              }}
+            />
+          ) : (
+            <>
 
           {/* A8: BATI / TROPICAL ASTROLOJİ MODÜL KARTI (10 GÖK CİSMİ GERÇEK HESAPLAMA AKIŞI) */}
           <div className="bg-stone-900/60 border border-stone-800 rounded-xl p-5 space-y-4">
@@ -1999,9 +2467,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
             {calcFeedback && (
               <div
                 className={`p-3 rounded-lg text-xs leading-relaxed flex items-start gap-2 border ${
-                  calcFeedback.type === 'success'
-                    ? 'bg-emerald-950/30 border-emerald-800/60 text-emerald-300'
-                    : 'bg-rose-950/30 border-rose-800/60 text-rose-300'
+                  calcFeedback.type === 'error'
+                    ? 'bg-rose-950/40 border-rose-800/70 text-rose-300'
+                    : calcFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800/70 text-amber-300'
+                    : 'bg-emerald-950/30 border-emerald-800/60 text-emerald-300'
                 }`}
               >
                 <span className="shrink-0 font-bold">
@@ -2020,9 +2490,9 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                     <div className="p-3 bg-amber-950/20 border border-amber-900/40 rounded-lg text-xs text-amber-300/90 leading-relaxed flex items-start gap-2">
                       <span className="text-amber-400 font-bold shrink-0">⚠️</span>
                       <div>
-                        <span className="font-semibold block">Doğum Saati Bilinmiyor (Öğle 12:00 Referansı)</span>
+                        <span className="font-semibold block">Doğum Saati Bilinmiyor (Öğle 12:00 Varsayımı)</span>
                         <p className="mt-0.5 text-[11px] text-amber-200/80">
-                          Gezegen konumları öğle 12:00 varsayımıyla hesaplanmıştır. Doğum saati kesinleşmediği sürece Yükselen burç (ASC), Tepe Noktası (MC) ve evler üretilemez. Ay konumu gün içindeki hızlı hareketinden ötürü saat farkına göre birkaç derece sapma gösterebilir.
+                          {storedChart.timeUncertaintyNoticeTr || 'Doğum saati bilinmediği için hesaplama 12:00 varsayımıyla yapılmıştır. Ay konumu ve hızlı hareket eden gezegenlerin derecelerinde gün içi sapma payı bulunabilir.'}
                         </p>
                       </div>
                     </div>
@@ -2041,28 +2511,13 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                   <div className="p-2.5 bg-stone-950/70 border border-stone-800/80 rounded-lg text-[11px] text-stone-400 leading-relaxed flex items-start gap-2">
                     <span className="text-stone-500 font-bold shrink-0">ℹ</span>
                     <span>
-                      <strong className="text-stone-300">Kapsam Sınırı (Mevcut Sürüm):</strong> Yalnızca 10 gök cismi (Güneş, Ay, Merkür, Venüs, Mars, Jüpiter, Satürn, Uranüs, Neptün, Plüton) boylamları hesaplanmıştır. Kuzey/Güney Ay Düğümleri, ASC, MC ve Placidus evleri bu sürümün kapsamı dışındadır.
+                      <strong className="text-stone-300">Tasarım ve Hesaplama Kapsamı:</strong> Dövme reçetesi ve sembol hesaplamalarında yalnızca Batı/Tropical astrolojiye göre Ay burcu ve Yükselen burç (ASC) kullanılır. Güneş burcu, diğer gezegenler, evler, düğümler ve farklı sistemler tasarıma dahil edilmez.
                     </span>
                   </div>
                 </div>
 
-                {/* Özet Göstergeleri: Güneş ve Ay Burçları */}
+                {/* Özet Göstergeleri: Ay ve Yükselen Burçları */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-1">
-                    <span className="text-stone-500 block text-[10px] uppercase font-mono tracking-wider">Güneş Burcu (☉)</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-amber-400 text-base">
-                        {storedChart.sunSign ? TROPICAL_ZODIAC_SIGNS[storedChart.sunSign]?.symbolGlyph : '☉'}
-                      </span>
-                      <span className="font-semibold text-stone-100 text-sm">
-                        {storedChart.sunSign ? TROPICAL_ZODIAC_SIGNS[storedChart.sunSign]?.nameTr : 'Belirsiz'}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-stone-400 block font-mono">
-                      {storedChart.planetaryPositions.find((p) => p.body === 'Sun')?.formattedTextTr || ''}
-                    </span>
-                  </div>
-
                   <div className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-1">
                     <span className="text-stone-500 block text-[10px] uppercase font-mono tracking-wider">Ay Burcu (☽)</span>
                     <div className="flex items-center gap-1.5">
@@ -2075,6 +2530,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                     </div>
                     <span className="text-[10px] text-stone-400 block font-mono">
                       {storedChart.planetaryPositions.find((p) => p.body === 'Moon')?.formattedTextTr || ''}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-1">
+                    <span className="text-stone-500 block text-[10px] uppercase font-mono tracking-wider">Yükselen Burç (ASC)</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-violet-400 text-base">
+                        {storedChart.ascendantSign ? (TROPICAL_ZODIAC_SIGNS[storedChart.ascendantSign]?.symbolGlyph || 'ASC') : '—'}
+                      </span>
+                      <span className="font-semibold text-stone-100 text-sm">
+                        {storedChart.ascendantSign
+                          ? (TROPICAL_ZODIAC_SIGNS[storedChart.ascendantSign]?.nameTr || storedChart.ascendantSign)
+                          : (storedChart.isBirthTimeUnknown ? 'Belirsiz (12:00 Varsayımı)' : 'Hesaplanamadı')}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-stone-400 block font-mono">
+                      {storedChart.formattedAscendantTr || (storedChart.isBirthTimeUnknown ? 'Sonuç kesin değildir' : '')}
                     </span>
                   </div>
 
@@ -2429,12 +2901,23 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
             {numFeedback && (
               <div
                 className={`p-3 rounded-lg text-xs flex items-center justify-between border ${
-                  numFeedback.type === 'success'
-                    ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
-                    : 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+                  numFeedback.type === 'error'
+                    ? 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+                    : numFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800/80 text-amber-300'
+                    : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
                 }`}
               >
-                <span>{numFeedback.message}</span>
+                <div className="flex items-center gap-2">
+                  {numFeedback.type === 'error' ? (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  ) : numFeedback.type === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  ) : (
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  )}
+                  <span>{numFeedback.message}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setNumFeedback(null)}
@@ -2761,12 +3244,16 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                 className={`p-3 rounded-lg border text-xs flex items-start justify-between gap-2 ${
                   chakraFeedback.type === 'error'
                     ? 'bg-rose-950/40 border-rose-800/70 text-rose-300'
+                    : chakraFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800/70 text-amber-300'
                     : 'bg-emerald-950/40 border-emerald-800/70 text-emerald-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   {chakraFeedback.type === 'error' ? (
                     <X className="w-4 h-4 text-rose-400 shrink-0" />
+                  ) : chakraFeedback.type === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                   ) : (
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   )}
@@ -3058,8 +3545,78 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
               ))}
             </div>
           </div>
-        </div>
+
+          {/* AŞAMA 2 DEVAM ET & GERİ DÖNÜŞ NAVİGASYON ALANI */}
+          <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-3 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('PERSONAL_BIRTH')}
+                  className="px-3.5 py-2 rounded-lg text-xs font-medium text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Geri: Danışan Bilgileri</span>
+                </button>
+                <span className="text-xs text-stone-400 font-mono hidden sm:inline">
+                  (Tamamlanan: {[hasAstro, hasNum, hasChakra, hasArch].filter(Boolean).length} / 4 Analiz)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('TESTS')}
+                  disabled={!isAnalysesComplete}
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-md shadow-amber-950/30"
+                >
+                  <span>Devam Et: Enneagram & Totem Testlerine Geç</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {!isAnalysesComplete ? (
+              <div className="p-2.5 bg-amber-950/30 border border-amber-800/60 rounded-lg text-xs text-amber-300 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    <strong>Uyarı:</strong> Devam edebilmek için 4 temel analizin hesaplanması gerekmektedir. Eksik: {missingAnalyses.join(', ')}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2 bg-emerald-950/20 border border-emerald-800/40 rounded-lg text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Tüm 4 temel analiz (Astroloji, Numeroloji, Çakra, Arketip) başarıyla hazırlandı. Test aşamasına geçebilirsiniz.</span>
+              </div>
+            )}
+          </div>
+        </>
       )}
+
+      {/* Alt Navigasyon Barı: Geri ve Devam Et */}
+      <div className="flex items-center justify-between pt-4 border-t border-stone-800">
+        <button
+          type="button"
+          onClick={() => handleNavigateWithScroll('PERSONAL_BIRTH')}
+          className="px-4 py-2 text-xs font-medium text-stone-300 hover:text-white bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Geri: Danışanlar</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleNavigateWithScroll('TESTS')}
+          className="px-5 py-2.5 text-xs font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-sm shadow-amber-900/20"
+        >
+          <span>Devam Et: Testler</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )}
 
       {/* SEKME 3: PSİKOLOJİ & ARKETİPLER */}
       {activeTab === 'TESTS' && (
@@ -3072,7 +3629,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
             </div>
             <button
               type="button"
-              onClick={() => setActiveTab('RESULTS')}
+              onClick={() => handleNavigateWithScroll('RESULTS')}
               className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg font-medium transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0"
             >
               <span>Sonuçlar Merkezi</span>
@@ -3129,12 +3686,16 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                 className={`p-3 rounded-lg border text-xs flex items-start justify-between gap-2 ${
                   archFeedback.type === 'error'
                     ? 'bg-rose-950/40 border-rose-800/70 text-rose-300'
+                    : archFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border-amber-800/70 text-amber-300'
                     : 'bg-emerald-950/40 border-emerald-800/70 text-emerald-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   {archFeedback.type === 'error' ? (
                     <X className="w-4 h-4 text-rose-400 shrink-0" />
+                  ) : archFeedback.type === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                   ) : (
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   )}
@@ -3449,12 +4010,16 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                     className={`p-3 rounded-lg border text-xs flex items-start justify-between gap-2 ${
                       enneagramFeedback.type === 'error'
                         ? 'bg-rose-950/40 border-rose-800/70 text-rose-300'
+                        : enneagramFeedback.type === 'warning'
+                        ? 'bg-amber-950/40 border-amber-800/70 text-amber-300'
                         : 'bg-emerald-950/40 border-emerald-800/70 text-emerald-300'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       {enneagramFeedback.type === 'error' ? (
                         <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      ) : enneagramFeedback.type === 'warning' ? (
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                       ) : (
                         <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                       )}
@@ -3622,6 +4187,24 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                           Soru {enneagramActiveQIndex + 1} / 15
                         </span>
                         <div className="flex items-center gap-2 font-mono text-[11px] text-stone-400">
+                          {Object.keys(enneagramAnswers).length > 0 && (
+                            enneagramDraftStatus === 'failed' ? (
+                              <span className="text-[10px] text-rose-400 font-medium flex items-center gap-1 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                Taslak Kaydedilemedi
+                              </span>
+                            ) : enneagramDraftStatus === 'memory_only' || enneagramDraftStatus === 'partial_failure' ? (
+                              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-1 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                Taslak Oturum Belleğinde
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Taslak Kaydedildi
+                              </span>
+                            )
+                          )}
                           <span>{Object.keys(enneagramAnswers).length} / 15 Cevaplandı</span>
                           <span className="text-amber-400 font-bold">
                             (%{Math.round((Object.keys(enneagramAnswers).length / 15) * 100)})
@@ -3648,7 +4231,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                             <button
                               key={q.id}
                               type="button"
-                              onClick={() => setEnneagramActiveQIndex(idx)}
+                              onClick={() => handleEnneagramQuestionIndexChange(idx)}
                               className={`w-6 h-6 rounded text-[11px] font-mono font-medium flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                                 isCurrent
                                   ? 'bg-amber-500 text-stone-950 font-bold ring-2 ring-amber-400/50'
@@ -3717,7 +4300,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                         <button
                           type="button"
-                          onClick={() => setEnneagramActiveQIndex((prev) => Math.max(0, prev - 1))}
+                          onClick={() => handleEnneagramQuestionIndexChange(enneagramActiveQIndex - 1)}
                           disabled={enneagramActiveQIndex === 0}
                           className="px-3 py-1.5 rounded-lg border border-stone-800 text-xs text-stone-300 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                         >
@@ -3727,7 +4310,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
 
                         <button
                           type="button"
-                          onClick={() => setEnneagramActiveQIndex((prev) => Math.min(14, prev + 1))}
+                          onClick={() => handleEnneagramQuestionIndexChange(enneagramActiveQIndex + 1)}
                           disabled={enneagramActiveQIndex === 14}
                           className="px-3 py-1.5 rounded-lg border border-stone-800 text-xs text-stone-300 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                         >
@@ -3737,14 +4320,33 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                       </div>
 
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        {storedEnneagram && isEnneagramTaking && (
+                        {storedEnneagram && isEnneagramTaking ? (
                           <button
                             type="button"
-                            onClick={() => setIsEnneagramTaking(false)}
+                            onClick={() => {
+                              setIsEnneagramTaking(false);
+                              clearClientTestDraft(client.id, 'ENNEAGRAM');
+                              setEnneagramAnswers({});
+                              setEnneagramActiveQIndex(0);
+                            }}
                             className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200 cursor-pointer"
                           >
                             Vazgeç
                           </button>
+                        ) : (
+                          Object.keys(enneagramAnswers).length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                clearClientTestDraft(client.id, 'ENNEAGRAM');
+                                setEnneagramAnswers({});
+                                setEnneagramActiveQIndex(0);
+                              }}
+                              className="px-3 py-1.5 text-xs text-stone-400 hover:text-rose-400 cursor-pointer"
+                            >
+                              Taslağı Temizle
+                            </button>
+                          )
                         )}
 
                         <button
@@ -3783,12 +4385,16 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                     className={`p-3 rounded-lg border text-xs flex items-start justify-between gap-2 ${
                       totemFeedback.type === 'error'
                         ? 'bg-rose-950/40 border-rose-800/70 text-rose-300'
+                        : totemFeedback.type === 'warning'
+                        ? 'bg-amber-950/40 border-amber-800/70 text-amber-300'
                         : 'bg-emerald-950/40 border-emerald-800/70 text-emerald-300'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       {totemFeedback.type === 'error' ? (
                         <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      ) : totemFeedback.type === 'warning' ? (
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                       ) : (
                         <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                       )}
@@ -3918,6 +4524,211 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                           })}
                         </div>
                       </div>
+
+                      {/* A62: Dövme Tasarımı Öncelik Sıralaması & Alternatifler */}
+                      {(() => {
+                        const answersMapObj: Record<string, string> = {};
+                        (storedTotem.answers || []).forEach((ans) => {
+                          answersMapObj[ans.questionId] = ans.selectedOptionId;
+                        });
+                        const rankings =
+                          storedTotem.totemPriorityRankings && storedTotem.totemPriorityRankings.length > 0
+                            ? storedTotem.totemPriorityRankings
+                            : computeTotemPriorityRankings(answersMapObj, storedTotem.dominantScores);
+
+                        const selectedAnimal = storedTotem.selectedTotemAnimal;
+                        const rejectedList = storedTotem.rejectedTotemAnimals || [];
+
+                        const candidateRankings = rankings.filter((item) => item.isDesignCandidate && item.rawScore > 0);
+                        const zeroScoreAnimals = rankings.filter((item) => !item.isDesignCandidate || item.rawScore === 0);
+
+                        return (
+                          <div className="space-y-3 pt-3 border-t border-stone-800/80">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                              <div>
+                                <h4 className="text-xs font-semibold text-stone-200 flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Dövme Tasarımı Öncelik Sıralaması & Alternatifler (A62)</span>
+                                </h4>
+                                <p className="text-[11px] text-stone-400">
+                                  Mizaç analizi karakter eğilimini gösterir; dövme tasarımında ise danışan onayı olmadan hiçbir hayvan eklenemez (Kural 18).
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                                  Adaylar Rezonans Toplamı: %100.0
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Pozitif Puanlı Sıralı Hayvan Listesi */}
+                            <div className="grid grid-cols-1 gap-2.5">
+                              {candidateRankings.map((item) => {
+                                const isSelected = selectedAnimal === item.animal;
+                                const isRejected = rejectedList.includes(item.animal);
+                                const isRank1 = item.rank === 1;
+                                const isRank2 = item.rank === 2;
+
+                                return (
+                                  <div
+                                    key={item.animal}
+                                    className={`p-3 rounded-lg border transition-all text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                                      isSelected
+                                        ? 'bg-amber-950/40 border-amber-500/80 shadow-md ring-1 ring-amber-500/40'
+                                        : isRejected
+                                        ? 'bg-stone-950/40 border-stone-800/40 opacity-60'
+                                        : isRank1
+                                        ? 'bg-amber-950/20 border-amber-500/40'
+                                        : isRank2
+                                        ? 'bg-blue-950/20 border-blue-800/40'
+                                        : 'bg-stone-900/40 border-stone-800/70'
+                                    }`}
+                                  >
+                                    <div className="space-y-1.5 flex-1">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-stone-900 text-stone-300 border border-stone-800">
+                                          #{item.rank}
+                                        </span>
+                                        <span className="font-semibold text-stone-100 text-sm">
+                                          {item.animal}
+                                        </span>
+                                        <span className="text-[10px] text-stone-400 font-mono">
+                                          ({item.elementTr})
+                                        </span>
+
+                                        {/* Rol Etiketi */}
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                                            item.role === 'PRIMARY_DESIGN'
+                                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                                              : item.role === 'FIRST_ALTERNATIVE'
+                                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 font-bold'
+                                              : 'bg-stone-800 text-stone-400 border-stone-700'
+                                          }`}
+                                        >
+                                          {item.roleLabelTr}
+                                        </span>
+
+                                        {/* Durum Etiketi */}
+                                        {isSelected && (
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 flex items-center gap-1">
+                                            <Check className="w-3 h-3" />
+                                            <span>Tasarım İçin Onaylandı & Seçildi</span>
+                                          </span>
+                                        )}
+                                        {isRejected && (
+                                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-rose-950/40 text-rose-400 border border-rose-800/50">
+                                            Danışan Tarafından Reddedildi
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Puan ve Yüzde Bilgisi */}
+                                      <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-stone-400">
+                                        <span>
+                                          Ham Puan: <strong className="text-stone-200">{item.rawScore}p</strong>
+                                        </span>
+                                        <span className="text-stone-600">|</span>
+                                        <span>
+                                          Tasarım Öncelik Puanı: <strong className="text-amber-300">{item.priorityScore.toFixed(4)}</strong>
+                                        </span>
+                                        <span className="text-stone-600">|</span>
+                                        <span>
+                                          Nihai Rezonans: <strong className="text-emerald-400">{item.percentageFormatted}</strong>
+                                        </span>
+                                      </div>
+
+                                      {/* Ayrık Yüzde İlerleme Çubuğu */}
+                                      <div className="w-full bg-stone-950 rounded-full h-1.5 overflow-hidden border border-stone-800/60 max-w-md">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-300 ${
+                                            isRank1 ? 'bg-amber-500' : isRank2 ? 'bg-blue-400' : 'bg-stone-500'
+                                          }`}
+                                          style={{ width: `${Math.min(100, Math.max(2, item.percentage * 3.5))}%` }}
+                                        />
+                                      </div>
+
+                                      {/* Eşitlik ve Ayrım Gerekçesi */}
+                                      <p className="text-[10px] text-stone-400 leading-tight">
+                                        {item.tieBreakReasonTr}
+                                      </p>
+                                    </div>
+
+                                    {/* Eylem Butonları */}
+                                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                                      {isSelected ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRejectTotemAnimal(item.animal)}
+                                          className="px-2.5 py-1.5 rounded-lg text-[11px] bg-stone-800 hover:bg-rose-950 text-stone-400 hover:text-rose-300 border border-stone-700 transition-colors cursor-pointer"
+                                          title="Bu hayvanı reddet ve alternatif sıradakini öner"
+                                        >
+                                          Reddet ve Sıradakini Öner
+                                        </button>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSelectTotemForDesign(item.animal)}
+                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                              isRank1
+                                                ? 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-sm'
+                                                : isRank2
+                                                ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
+                                                : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700'
+                                            }`}
+                                          >
+                                            <Check className="w-3.5 h-3.5" />
+                                            <span>Tasarım İçin Seç ({item.roleLabelTr})</span>
+                                          </button>
+
+                                          {!isRejected && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleRejectTotemAnimal(item.animal)}
+                                              className="px-2 py-1.5 rounded-lg text-[11px] text-stone-500 hover:text-rose-400 hover:bg-stone-900 transition-colors cursor-pointer"
+                                              title="Bu hayvanı tasarım için reddet"
+                                            >
+                                              Reddet
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* 0 Ham Puanlı Hayvanlar (Tasarım Önerisi Dışı) */}
+                            {zeroScoreAnimals.length > 0 && (
+                              <div className="mt-3 p-3 bg-stone-950/50 border border-stone-800/60 rounded-lg space-y-1.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                  <span className="text-[11px] font-semibold text-stone-400">
+                                    Tasarım Önerisi Dışı Hayvanlar (0 Ham Puan)
+                                  </span>
+                                  <span className="text-[10px] font-mono text-stone-500">
+                                    Öncelik Puanı: 0.0000 | Rezonans: %0.0
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-stone-500 leading-relaxed">
+                                  Danışanın cevaplarında 0 puan alan hayvanlara yapay pozitif puan veya yüzde verilmez; dövme tasarım öneri listesinin dışında tutulur.
+                                </p>
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {zeroScoreAnimals.map((item) => (
+                                    <span
+                                      key={item.animal}
+                                      className="px-2 py-0.5 rounded bg-stone-900 border border-stone-800 text-[10px] text-stone-500 font-mono"
+                                    >
+                                      {item.animal} (0p · %0.0)
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Alt Aksiyonlar: Yeniden Yap ve Sıfırla */}
@@ -3927,7 +4738,22 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                         <span>Totem sonucu {client.firstName} {client.lastName} ({client.id}) arşivinde kayıtlıdır.</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CopyButton
+                          textToCopy={() => formatTotemDetailedCopyText(client, archive)}
+                          label="Tüm Testi Kopyala"
+                          copiedLabel="Kopyalandı ✓"
+                          variant="gold"
+                          size="sm"
+                          title="Tüm 10 soruyu, danışanın gerçek cevaplarını ve totem analiz sonucunu panoya kopyalar"
+                          onSuccess={() => {
+                            setTotemFeedback({
+                              type: 'success',
+                              message: 'Totem testi soruları, cevapları ve analiz sonuçları panoya başarıyla kopyalandı.',
+                            });
+                          }}
+                        />
+
                         {showClearTotemConfirm ? (
                           <div className="flex items-center gap-1.5 bg-rose-950/40 border border-rose-900/60 p-1 rounded-lg">
                             <span className="text-[10px] text-rose-300">Totem sıfırlansın mı?</span>
@@ -3977,6 +4803,24 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                           Soru {totemActiveQIndex + 1} / 10
                         </span>
                         <div className="flex items-center gap-2 font-mono text-[11px] text-stone-400">
+                          {Object.keys(totemAnswers).length > 0 && (
+                            totemDraftStatus === 'failed' ? (
+                              <span className="text-[10px] text-rose-400 font-medium flex items-center gap-1 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                Taslak Kaydedilemedi
+                              </span>
+                            ) : totemDraftStatus === 'memory_only' || totemDraftStatus === 'partial_failure' ? (
+                              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-1 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                Taslak Oturum Belleğinde
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Taslak Kaydedildi
+                              </span>
+                            )
+                          )}
                           <span>{Object.keys(totemAnswers).length} / 10 Cevaplandı</span>
                           <span className="text-amber-400 font-bold">
                             (%{Math.round((Object.keys(totemAnswers).length / 10) * 100)})
@@ -4003,7 +4847,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                             <button
                               key={q.id}
                               type="button"
-                              onClick={() => setTotemActiveQIndex(idx)}
+                              onClick={() => handleTotemQuestionIndexChange(idx)}
                               className={`w-6 h-6 rounded text-[11px] font-mono font-medium flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                                 isCurrent
                                   ? 'bg-amber-500 text-stone-950 font-bold ring-2 ring-amber-400/50'
@@ -4072,7 +4916,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                         <button
                           type="button"
-                          onClick={() => setTotemActiveQIndex((prev) => Math.max(0, prev - 1))}
+                          onClick={() => handleTotemQuestionIndexChange(totemActiveQIndex - 1)}
                           disabled={totemActiveQIndex === 0}
                           className="px-3 py-1.5 rounded-lg border border-stone-800 text-xs text-stone-300 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                         >
@@ -4082,7 +4926,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
 
                         <button
                           type="button"
-                          onClick={() => setTotemActiveQIndex((prev) => Math.min(9, prev + 1))}
+                          onClick={() => handleTotemQuestionIndexChange(totemActiveQIndex + 1)}
                           disabled={totemActiveQIndex === 9}
                           className="px-3 py-1.5 rounded-lg border border-stone-800 text-xs text-stone-300 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                         >
@@ -4092,14 +4936,33 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                       </div>
 
                       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        {storedTotem && isTotemTaking && (
+                        {storedTotem && isTotemTaking ? (
                           <button
                             type="button"
-                            onClick={() => setIsTotemTaking(false)}
+                            onClick={() => {
+                              setIsTotemTaking(false);
+                              clearClientTestDraft(client.id, 'ANIMAL_TOTEM');
+                              setTotemAnswers({});
+                              setTotemActiveQIndex(0);
+                            }}
                             className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-200 cursor-pointer"
                           >
                             Vazgeç
                           </button>
+                        ) : (
+                          Object.keys(totemAnswers).length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                clearClientTestDraft(client.id, 'ANIMAL_TOTEM');
+                                setTotemAnswers({});
+                                setTotemActiveQIndex(0);
+                              }}
+                              className="px-3 py-1.5 text-xs text-stone-400 hover:text-rose-400 cursor-pointer"
+                            >
+                              Taslağı Temizle
+                            </button>
+                          )
                         )}
 
                         <button
@@ -4114,13 +4977,71 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                     </div>
                   </div>
                 )}
+
+                {/* Totem Sonu: Tüm Testi Kopyala */}
+                <div className="pt-3 border-t border-stone-800/80 flex items-center justify-between">
+                  <span className="text-[10px] text-stone-500">10 Soru, Cevaplar & Totem Sonucu</span>
+                  <CopyButton
+                    textToCopy={() => formatTotemDetailedCopyText(client, archive)}
+                    label="Tüm Testi Kopyala"
+                    variant="outline"
+                    size="sm"
+                    title="10 soru, danışanın cevapları ve Hayvan Totemi sonucunu panoya kopyalar"
+                    onSuccess={() => {
+                      setTotemFeedback({
+                        type: 'success',
+                        message: 'Totem testi soruları, cevapları ve analiz sonuçları panoya başarıyla kopyalandı.',
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* TESTLER DEVAM ET & GERİ DÖNÜŞ NAVİGASYON ALANI */}
+          <div className="p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-3 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('ANALYSES')}
+                  className="px-3.5 py-2 rounded-lg text-xs font-medium text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Geri: Analiz</span>
+                </button>
+                <span className="text-xs text-stone-400 font-mono hidden sm:inline">
+                  Enneagram: {storedEnneagram ? '✓ Kayıtlı' : 'Beklemede'} · Totem: {storedTotem ? '✓ Kayıtlı' : 'Beklemede'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('SYMBOLS')}
+                  disabled={isEnneagramTaking || isTotemTaking}
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-md shadow-amber-950/30"
+                >
+                  <span>Devam Et: Sembol Kütüphanesine Geç</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {(isEnneagramTaking || isTotemTaking) && (
+              <div className="p-2.5 bg-amber-950/30 border border-amber-800/60 rounded-lg text-xs text-amber-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Uyarı:</strong> Şu anda bir test çözmektesiniz. Devam etmeden önce lütfen testi tamamlayınız veya &quot;Vazgeç&quot; butonuna tıklayınız.
+                </span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* SEKME 4: SEMBOLLER & GÖRSEL TASARIM MOTORU (A16) */}
+      {/* SEKME 4: SEMBOL KÜTÜPHANESİ */}
       {activeTab === 'SYMBOLS' && (
         <div className="space-y-6">
           {/* 1. Modül Başlığı ve Durum Alanı */}
@@ -4130,11 +5051,11 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                 <div className="flex items-center gap-2">
                   <Shapes className="w-5 h-5 text-amber-400" />
                   <h3 className="text-base font-semibold text-stone-200">
-                    A16: Sembol Kütüphanesi & Görsel Tasarım Motoru
+                    Sembol Kütüphanesi & Kompozisyon Yönetimi
                   </h3>
                 </div>
                 <p className="text-xs text-stone-400">
-                  {client.firstName} {client.lastName} için kutsal geometri, kadim glifler ve analiz rezonanslarına dayalı görsel tasarım istemi (AI/Midjourney) sentezi.
+                  {client.firstName} {client.lastName} için kutsal geometri, kadim glifler ve analiz rezonanslarına dayalı sembol kataloğu ve kompozisyon seçimi.
                 </p>
               </div>
 
@@ -4196,13 +5117,17 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                 className={`p-3 rounded-lg text-xs flex items-start gap-2 ${
                   symbolFeedback.type === 'error'
                     ? 'bg-rose-950/40 border border-rose-900/60 text-rose-300'
+                    : symbolFeedback.type === 'warning'
+                    ? 'bg-amber-950/40 border border-amber-900/60 text-amber-300'
                     : 'bg-emerald-950/40 border border-emerald-900/60 text-emerald-300'
                 }`}
               >
                 {symbolFeedback.type === 'error' ? (
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                ) : symbolFeedback.type === 'warning' ? (
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                 ) : (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
                 )}
                 <span className="leading-relaxed">{symbolFeedback.message}</span>
               </div>
@@ -4238,26 +5163,156 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
           </div>
 
           {/* 2. Danışanın Analizlerine Göre Akıllı Sembol Önerileri */}
-          <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-semibold text-stone-200">
-                Danışanın Analiz Çıktılarına Göre Önerilen Kutsal Semboller
-              </h4>
+          <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-semibold text-stone-200">
+                  Danışanın Analiz Çıktılarına Göre Önerilen Kutsal Semboller ({recommendedSymbolsList.length})
+                </h4>
+              </div>
+
+              {/* Aşama 5.2.2: Semboller Arası Kompozisyon ve Uyum Raporu Butonu */}
+              {recommendedSymbolsList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowHarmonyReport(!showHarmonyReport)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
+                    showHarmonyReport
+                      ? 'bg-amber-400 text-stone-950 border-amber-400 font-semibold shadow-sm'
+                      : 'bg-stone-950 text-stone-300 hover:text-white border-stone-800 hover:border-amber-500/50'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Kompozisyon & Uyum Raporu ({crossSymbolHarmonyReport.symbolCount})</span>
+                  {showHarmonyReport ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              )}
             </div>
+
             <p className="text-[11px] text-stone-400">
               Astroloji burçları, Yaşam Yolu titreşimi, blokaj çakrası ve arketip modelinin ortak rezonansından seçilen semboller:
             </p>
 
+            {/* Aşama 5.2.2: Açılır/Kapanır Kompozisyon ve Uyum Raporu */}
+            {showHarmonyReport && recommendedSymbolsList.length > 0 && (
+              <div className="p-4 bg-stone-950/90 border border-stone-800 rounded-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-800">
+                  <div className="flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-semibold text-stone-200">
+                      Önerilen Semboller Arası Kompozisyon ve Tasarım Uyumu
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                      crossSymbolHarmonyReport.overallRating === 'EXCELLENT'
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50'
+                        : crossSymbolHarmonyReport.overallRating === 'BALANCED'
+                          ? 'bg-sky-950/90 text-sky-300 border-sky-500/50'
+                          : crossSymbolHarmonyReport.overallRating === 'COMPLEX'
+                            ? 'bg-amber-950/90 text-amber-300 border-amber-500/50'
+                            : 'bg-rose-950/90 text-rose-300 border-rose-500/50'
+                    }`}
+                  >
+                    {crossSymbolHarmonyReport.overallRatingLabelTr}
+                  </span>
+                </div>
+
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  {crossSymbolHarmonyReport.overallSummaryTr}
+                </p>
+
+                {/* 4 Boyutlu Uyum Değerlendirmesi */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 bg-stone-900/60 border border-stone-800/80 rounded-lg space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-amber-400/90 font-semibold block">
+                      Element Etkileşimi & Dengesi
+                    </span>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {crossSymbolHarmonyReport.elementalInterplayTr}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-stone-900/60 border border-stone-800/80 rounded-lg space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-amber-400/90 font-semibold block">
+                      Geometrik Biçim & Çizgi Uyumu
+                    </span>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {crossSymbolHarmonyReport.geometricInterplayTr}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-stone-900/60 border border-stone-800/80 rounded-lg space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-amber-400/90 font-semibold block">
+                      İğne ve Uygulama Tekniği
+                    </span>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {crossSymbolHarmonyReport.needleStyleSynergyTr}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-stone-900/60 border border-stone-800/80 rounded-lg space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-amber-400/90 font-semibold block">
+                      Görsel Baskınlık & Hiyerarşi
+                    </span>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      {crossSymbolHarmonyReport.hierarchyEvaluationTr}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Uyarılar ve Tasarım Riskleri (Varsa) */}
+                {crossSymbolHarmonyReport.warningsAndCautions.length > 0 && (
+                  <div className="p-3 bg-rose-950/30 border border-rose-800/50 rounded-lg space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-300">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Tasarım Uyarısı & Hiyerarşik Denge Notu</span>
+                    </div>
+                    {crossSymbolHarmonyReport.warningsAndCautions.map((warn, wIdx) => (
+                      <p key={wIdx} className="text-[11px] text-rose-200/90 leading-relaxed">
+                        • {warn}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Önerilen Hiyerarşik Katmanlaşma Özeti */}
+                <div className="p-3 bg-stone-900/40 border border-stone-800 rounded-lg space-y-1.5 text-[11px]">
+                  <span className="text-[10px] font-mono uppercase text-stone-400 font-semibold block">
+                    Önerilen Kompozisyon Katman Dağılımı
+                  </span>
+                  <div className="flex flex-wrap gap-2 text-stone-300">
+                    {crossSymbolHarmonyReport.recommendedHierarchy.primarySymbol && (
+                      <span className="px-2 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-900/50">
+                        <strong>Ana Odak (%65):</strong> {crossSymbolHarmonyReport.recommendedHierarchy.primarySymbol.name}
+                      </span>
+                    )}
+                    {crossSymbolHarmonyReport.recommendedHierarchy.secondarySymbols.length > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-stone-900 text-stone-300 border border-stone-800">
+                        <strong>İkincil Destek (%35):</strong> {crossSymbolHarmonyReport.recommendedHierarchy.secondarySymbols.map((s) => s.name).join(', ')}
+                      </span>
+                    )}
+                    {crossSymbolHarmonyReport.recommendedHierarchy.accentSymbols.length > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-stone-900 text-stone-400 border border-stone-800">
+                        <strong>Vurgu / Aksan:</strong> {crossSymbolHarmonyReport.recommendedHierarchy.accentSymbols.map((s) => s.name).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
               {recommendedSymbolsList.map((rec) => {
                 const isAlreadySelected = selectedSymbolItems.some((s) => s.symbolId === rec.symbol.id);
+                const isExpanded = Boolean(expandedRationaleIds[rec.symbol.id]);
                 return (
                   <div
                     key={rec.symbol.id}
-                    className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-2 flex flex-col justify-between"
+                    className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-2.5 flex flex-col justify-between"
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-amber-300 text-xs">{rec.symbol.name}</span>
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-stone-900 text-stone-400 border border-stone-800">
@@ -4270,6 +5325,81 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                       <p className="text-[11px] text-stone-300 leading-tight line-clamp-2">
                         {rec.reasonTr}
                       </p>
+
+                      {/* Aşama 5.2.2: Gerekçe & Kompozisyon Rolü Açılır/Kapanır Detay Paneli */}
+                      <div className="pt-1 border-t border-stone-800/60 space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleRationale(rec.symbol.id)}
+                          className="w-full text-left py-1 px-2 rounded bg-stone-900/80 hover:bg-stone-900 text-[10px] text-stone-400 hover:text-stone-200 border border-stone-800/60 flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <span className="font-medium text-amber-400/90 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-400" />
+                            <span>Gerekçe & Kompozisyon Rolü</span>
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-3 h-3 text-stone-400" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 text-stone-400" />
+                          )}
+                        </button>
+
+                        {isExpanded && (() => {
+                          const rationale = evaluateSymbolRationale(rec, archive);
+                          return (
+                            <div className="p-2.5 bg-stone-900/95 border border-stone-800 rounded text-[10px] space-y-2">
+                              {/* Tasarım Rolü */}
+                              <div className="space-y-0.5">
+                                <span className="text-[9px] uppercase font-mono text-stone-500 block">Tasarım Rolü</span>
+                                <p className="text-amber-300 font-medium">
+                                  {rationale.designRoleDescription}
+                                </p>
+                              </div>
+
+                              {/* Neden Önerildi */}
+                              <div className="space-y-0.5">
+                                <span className="text-[9px] uppercase font-mono text-stone-500 block">Neden Önerildi?</span>
+                                <p className="text-stone-300 leading-relaxed">
+                                  {rationale.whyRecommended}
+                                </p>
+                              </div>
+
+                              {/* İlgili Analiz Modülleri */}
+                              {rationale.associatedModules.length > 0 && (
+                                <div className="space-y-1">
+                                  <span className="text-[9px] uppercase font-mono text-stone-500 block">İlişkili Analiz Modülleri</span>
+                                  <div className="space-y-1 bg-stone-950/60 p-1.5 rounded border border-stone-800/50">
+                                    {rationale.associatedModules.map((m, mIdx) => (
+                                      <div key={mIdx} className="text-[10px] leading-tight">
+                                        <strong className="text-amber-400/90">[{m.module} · {m.target}]:</strong>{' '}
+                                        <span className="text-stone-300">{m.rationaleTr}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Geometrik & Kavramsal Uyum */}
+                              <div className="space-y-0.5">
+                                <span className="text-[9px] uppercase font-mono text-stone-500 block">Kavramsal & Geometrik Uyum</span>
+                                <p className="text-stone-400 leading-relaxed">
+                                  {rationale.conceptualAndGeometricAlignment}
+                                </p>
+                              </div>
+
+                              {/* Dövme Uygulama Notları */}
+                              <div className="pt-1 border-t border-stone-800/50 flex flex-wrap gap-1 text-[9px] font-mono text-stone-400">
+                                <span className="px-1.5 py-0.5 rounded bg-stone-950 border border-stone-800 text-stone-300">
+                                  İğne: {rationale.tattooDirectives.needleStyle}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-stone-950 border border-stone-800 text-stone-300">
+                                  Ölçek: {rationale.tattooDirectives.recommendedScales.join(', ')}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     <button
@@ -4393,121 +5523,15 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                   <button
                     type="button"
                     onClick={handleSaveSymbolAnalysis}
-                    className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Sembol Kompozisyonunu Arşive Kaydet</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleGenerateUnifiedPrompt}
                     className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-md shadow-amber-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Nihai Görsel Prompt Sentezle (10 Adımlı Zincir)</span>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Sembol Kompozisyonunu Arşive Kaydet</span>
                   </button>
                 </div>
               </div>
             )}
           </div>
-
-          {/* 4. Sentezlenen 10 Adımlı Görsel Tasarım İstemi (AI/Midjourney Prompt Çıktısı) */}
-          {generatedVisualPrompt && (
-            <div className="bg-stone-950 border border-stone-800 rounded-xl p-6 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-amber-400" />
-                  <div>
-                    <h4 className="text-sm font-semibold text-stone-100">
-                      Sentezlenmiş Görsel Tasarım İstemi (Midjourney / Stable Diffusion)
-                    </h4>
-                    <span className="text-[10px] text-stone-500 font-mono">
-                      Danışan → Analiz → A15 Reçete → Semboller → Stil → Yerleşim → Kompozisyon → Teknik Talimat
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleCopySymbolPrompt(generatedVisualPrompt.primaryPromptEn)}
-                  className="px-3 py-1.5 rounded bg-stone-900 hover:bg-stone-800 border border-stone-700 text-amber-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  {copiedSymbolPrompt ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Kopyalandı!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>İngilizce Promptu Kopyala</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* İngilizce Master Prompt */}
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase font-mono text-stone-400 font-semibold block">
-                  İngilizce Görsel Üretim İstemi (Primary Prompt)
-                </span>
-                <div className="p-3.5 bg-stone-900 border border-stone-800 rounded-lg text-xs font-mono text-stone-200 leading-relaxed break-words select-all">
-                  {generatedVisualPrompt.primaryPromptEn}
-                </div>
-              </div>
-
-              {/* Konsept Özeti ve Negatif Prompt */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-stone-900/60 border border-stone-800 rounded-lg space-y-1">
-                  <span className="text-[10px] uppercase font-mono text-stone-500 block">Türkçe Konsept Özeti</span>
-                  <p className="text-[11px] text-stone-300 leading-relaxed">
-                    {generatedVisualPrompt.conceptPromptTr}
-                  </p>
-                </div>
-
-                <div className="p-3 bg-stone-900/60 border border-stone-800 rounded-lg space-y-1">
-                  <span className="text-[10px] uppercase font-mono text-stone-500 block">
-                    Negatif Parametreler (Hariç Tutulanlar Dahil)
-                  </span>
-                  <p className="text-[11px] font-mono text-rose-300/80 leading-relaxed">
-                    {generatedVisualPrompt.negativePrompt}
-                  </p>
-                </div>
-              </div>
-
-              {/* Kompozisyon ve Teknik Talimatlar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 bg-stone-900/40 border border-stone-800/80 rounded-lg space-y-2">
-                  <span className="text-[10px] uppercase font-mono text-amber-400 font-semibold block">
-                    Kompozisyon Hiyerarşisi
-                  </span>
-                  <ul className="space-y-1">
-                    {generatedVisualPrompt.compositionHierarchy.map((h, hIdx) => (
-                      <li key={hIdx} className="text-[11px] text-stone-300 flex items-start gap-1.5">
-                        <span className="text-amber-400 shrink-0 mt-0.5">•</span>
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="p-3.5 bg-stone-900/40 border border-stone-800/80 rounded-lg space-y-2">
-                  <span className="text-[10px] uppercase font-mono text-stone-400 font-semibold block">
-                    Sanatçı Teknik Çizim Talimatları (Kural 13 & 14)
-                  </span>
-                  <ul className="space-y-1">
-                    {generatedVisualPrompt.technicalDirectives.map((t, tIdx) => (
-                      <li key={tIdx} className="text-[11px] text-stone-300 flex items-start gap-1.5">
-                        <span className="text-stone-500 shrink-0 mt-0.5">•</span>
-                        <span>{t}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* 5. MASTER_SYMBOLS Kütüphanesi Tarayıcısı */}
           <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-5 space-y-4">
@@ -4598,15 +5622,38 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                 return true;
               }).map((sym) => {
                 const isSelected = selectedSymbolItems.some((s) => s.symbolId === sym.id);
+                const recommendation = recommendedSymbolMap.get(sym.id);
+                const isRecommended = Boolean(recommendation);
                 return (
                   <div
                     key={sym.id}
-                    className="p-3.5 bg-stone-950/70 border border-stone-800/80 rounded-lg space-y-2.5 flex flex-col justify-between hover:border-stone-700 transition-colors"
+                    className={`p-3.5 rounded-lg space-y-2.5 flex flex-col justify-between transition-all ${
+                      isRecommended
+                        ? 'bg-emerald-950/20 border-2 border-emerald-500/60 shadow-[0_0_14px_rgba(16,185,129,0.08)] hover:border-emerald-400/80'
+                        : 'bg-stone-950/70 border border-stone-800/80 hover:border-stone-700'
+                    }`}
                   >
                     <div className="space-y-1.5">
+                      {/* Aşama 5.2.1: Analizle Eşleşen Sembol İçin Rozet */}
+                      {isRecommended && (
+                        <div className="flex items-center justify-between pb-1 border-b border-emerald-900/30">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 shadow-sm">
+                            <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>Tasarım Önerisi</span>
+                          </span>
+                          {recommendation?.sourceModule && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-stone-900/90 text-stone-400 border border-stone-800">
+                              {recommendation.sourceModule} ({recommendation.matchingScore}p)
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="font-semibold text-stone-100 text-xs block">{sym.name}</span>
+                          <span className={`font-semibold text-xs block ${isRecommended ? 'text-emerald-200' : 'text-stone-100'}`}>
+                            {sym.name}
+                          </span>
                           {sym.originalName && (
                             <span className="text-[10px] text-stone-500 font-mono block italic">
                               {sym.originalName}
@@ -4617,6 +5664,13 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                           {sym.originCulture}
                         </span>
                       </div>
+
+                      {/* Aşama 5.2.1 & 5.2.2: Analiz Uyum Açıklaması */}
+                      {isRecommended && recommendation?.reasonTr && (
+                        <p className="text-[10px] text-emerald-300/90 leading-tight bg-emerald-950/40 border border-emerald-900/40 rounded px-2 py-1">
+                          <strong className="font-semibold text-emerald-200">Uyum:</strong> {recommendation.reasonTr}
+                        </p>
+                      )}
 
                       <p className="text-[11px] text-stone-400 leading-relaxed line-clamp-3">
                         {sym.meaning}
@@ -4629,17 +5683,82 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
                         <span className="px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800/60">
                           {sym.elementAssociation}
                         </span>
+                        <span className="px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800/60 text-stone-400">
+                          {getDesignRoleDescription(sym.compositionRole).titleTr}
+                        </span>
                       </div>
+
+                      {/* Aşama 5.2.2: Önerilen Sembol İçin Açılır/Kapanır Detaylı Gerekçe Paneli */}
+                      {isRecommended && recommendation && (
+                        <div className="pt-1 border-t border-emerald-900/30 space-y-1.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleRationale('master_' + sym.id)}
+                            className="w-full text-left py-1 px-2 rounded bg-emerald-950/40 hover:bg-emerald-950/70 text-[10px] text-emerald-300 border border-emerald-900/60 flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <span className="font-medium flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-emerald-400" />
+                              <span>Gerekçe & Kompozisyon Detayı</span>
+                            </span>
+                            {expandedRationaleIds['master_' + sym.id] ? (
+                              <ChevronUp className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 text-emerald-400" />
+                            )}
+                          </button>
+
+                          {expandedRationaleIds['master_' + sym.id] && (() => {
+                            const rationale = evaluateSymbolRationale(recommendation, archive);
+                            return (
+                              <div className="p-2.5 bg-stone-900/95 border border-emerald-900/40 rounded text-[10px] space-y-2">
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] uppercase font-mono text-emerald-400/80 block">Tasarım Rolü</span>
+                                  <p className="text-emerald-200 font-medium">
+                                    {rationale.designRoleDescription}
+                                  </p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] uppercase font-mono text-stone-400 block">Neden Önerildi?</span>
+                                  <p className="text-stone-300 leading-relaxed">
+                                    {rationale.whyRecommended}
+                                  </p>
+                                </div>
+                                {rationale.associatedModules.length > 0 && (
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] uppercase font-mono text-stone-400 block">İlişkili Analiz Modülleri</span>
+                                    <div className="space-y-1 bg-stone-950/60 p-1.5 rounded border border-stone-800/50">
+                                      {rationale.associatedModules.map((m, mIdx) => (
+                                        <div key={mIdx} className="text-[10px] leading-tight">
+                                          <strong className="text-emerald-300">[{m.module} · {m.target}]:</strong>{' '}
+                                          <span className="text-stone-300">{m.rationaleTr}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="space-y-0.5">
+                                  <span className="text-[9px] uppercase font-mono text-stone-400 block">Kavramsal & Geometrik Uyum</span>
+                                  <p className="text-stone-400 leading-relaxed">
+                                    {rationale.conceptualAndGeometricAlignment}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     <button
                       type="button"
                       disabled={isSelected}
-                      onClick={() => handleAddSymbol(sym, 'SECONDARY')}
+                      onClick={() => handleAddSymbol(sym, recommendation ? recommendation.suggestedWeight : 'SECONDARY')}
                       className={`w-full py-1.5 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
                         isSelected
                           ? 'bg-stone-900 text-stone-500 border border-stone-800 cursor-not-allowed'
-                          : 'bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-200 border border-stone-700'
+                          : isRecommended
+                            ? 'bg-emerald-900/50 hover:bg-emerald-500 hover:text-stone-950 text-emerald-200 border border-emerald-700/60'
+                            : 'bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-200 border border-stone-700'
                       }`}
                     >
                       {isSelected ? (
@@ -4712,7 +5831,7 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
             </div>
           )}
 
-          {/* Sembol Analizi Sonu: Genel Kopyala */}
+          {/* Sembol Analizi Sonu: Genel Kopyala ve Aşama 5 Navigasyon Barı */}
           <div className="pt-3 border-t border-stone-800/80 flex items-center justify-between">
             <span className="text-[10px] text-stone-500">Sembol ve Geometri Seçimleri</span>
             <CopyButton
@@ -4723,86 +5842,67 @@ export const ClientDetailCard: React.FC<ClientDetailCardProps> = ({ client, arch
               title="Sembol ve geometri analizini panoya kopyalar"
             />
           </div>
-        </div>
-      )}
 
-      {/* SEKME 5: DÖVME TASARIMI & REÇETESİ (A15 & A29) */}
-      {activeTab === 'DESIGN' && (
-        <ClientTattooDesignWorkflow
-          client={client}
-          archive={archive}
-          onNavigateToTab={(tab) => {
-            if (tab === 'ANALYSES') setActiveTab('ANALYSES');
-            else if (tab === 'RESULTS') setActiveTab('RESULTS');
-            else if (tab === 'TESTS') setActiveTab('TESTS');
-            else if (tab === 'SYMBOLS') setActiveTab('SYMBOLS');
-            else if (tab === 'CLIENT_INFO') setActiveTab('PERSONAL_BIRTH');
-          }}
-        />
-      )}
-
-      {/* 4. AŞAMA 5: ORTAK ALTYAPI VE MODÜL BAĞLANTILARI PANELİ */}
-      <div className="bg-stone-900/40 border border-stone-800 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-800">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-semibold text-stone-200">
-              Modül Bağlantıları ve Akış Durumu (Ortak Altyapı)
-            </h3>
-          </div>
-          <span className="text-[11px] font-mono text-stone-400">
-            Danışan Kimliği: <span className="text-amber-400">{client.id}</span>
-          </span>
-        </div>
-
-        {/* Akış Önerisi */}
-        <div className="p-3 bg-stone-950/80 border border-stone-800/80 rounded-lg flex items-start gap-3 text-xs">
-          <div className="w-6 h-6 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
-            <ArrowRight className="w-3.5 h-3.5" />
-          </div>
-          <div className="space-y-0.5">
-            <span className="text-stone-300 font-medium block">Sıradaki Akış Adımı:</span>
-            <p className="text-stone-400 text-[11px] leading-relaxed">
-              {pipelineReport.nextRecommendedActionTr}
-            </p>
-          </div>
-        </div>
-
-        {/* 9 Modülün Ortak Girdi ve Hazırlık Durumu */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1 text-xs">
-          {Object.values(MODULE_REGISTRY).map((mod) => {
-            const execStatus = getModuleExecutionStatus(client, archive, mod.id);
-            const statusLabel = mod.statusLabelTr[execStatus];
-
-            return (
-              <div
-                key={mod.id}
-                className="p-3 bg-stone-950/60 border border-stone-800/60 rounded-lg space-y-1.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-stone-200 truncate">{mod.name}</span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ml-1 ${
-                      execStatus === 'COMPLETED'
-                        ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-                        : execStatus === 'READY_TO_RUN'
-                        ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
-                        : 'bg-stone-900 border-stone-800 text-stone-500'
-                    }`}
-                  >
-                    {execStatus === 'COMPLETED' ? 'Hesaplandı' : execStatus === 'READY_TO_RUN' ? 'Girdiler Hazır' : 'Girdi Eksik'}
+          {/* SEMBOLLER DEVAM ET & GERİ DÖNÜŞ NAVİGASYON ALANI */}
+          <div className="mt-4 p-4 bg-stone-900/90 border border-stone-800 rounded-xl space-y-3 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('TESTS')}
+                  className="px-4 py-2.5 rounded-xl border border-stone-700/80 bg-stone-900/90 hover:bg-stone-800 text-stone-300 hover:text-stone-100 font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Geri: Testler</span>
+                </button>
+                <div className="hidden md:block">
+                  <span className="text-xs font-semibold text-stone-200 block">
+                    Sıradaki Aşama: 5. Dövme Reçetesi
+                  </span>
+                  <span className="text-[11px] text-stone-400 block">
+                    {selectedSymbolItems.length > 0
+                      ? `${selectedSymbolItems.length} sembol seçildi. Dövme reçetesi oluşturmaya hazırsınız.`
+                      : 'Sembol seçimi isteğe bağlıdır; dövme reçetesinde sistem önerileriyle de devam edebilirsiniz.'}
                   </span>
                 </div>
-                <p className="text-[11px] text-stone-500 line-clamp-1">{mod.description}</p>
-                <div className="text-[10px] text-stone-400 pt-1 border-t border-stone-800/40 flex justify-between items-center">
-                  <span>Modül Durumu:</span>
-                  <span className="text-amber-400/90 font-mono text-[10px]">{statusLabel}</span>
-                </div>
               </div>
-            );
-          })}
+
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border mr-1 ${
+                    selectedSymbolItems.length > 0
+                      ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                      : 'bg-stone-800/60 border-stone-700 text-stone-400'
+                  }`}
+                >
+                  {selectedSymbolItems.length > 0
+                    ? `${selectedSymbolItems.length} Sembol Seçili ✓`
+                    : 'Serbest Seçim Modu'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('RECIPE')}
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-md shadow-amber-950/30"
+                >
+                  <span>Devam Et: Dövme Sunumu & Rapora Geç</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* SEKME 5: DÖVME SUNUMU & RAPOR */}
+      {(activeTab === 'RECIPE' || activeTab === 'DESIGN') && (
+        <ClientTattooPresentationReportSection
+          client={client}
+          archive={archive}
+          onNavigateToTab={handleNavigateWithScroll}
+          selectedSymbolItems={effectiveSelectedSymbolItems}
+          onOpenExportModal={() => setShowExportModal(true)}
+        />
+      )}
 
       {/* A26: Danışan Dosyası ve Dışa Aktarma Modalı */}
       {showExportModal && (

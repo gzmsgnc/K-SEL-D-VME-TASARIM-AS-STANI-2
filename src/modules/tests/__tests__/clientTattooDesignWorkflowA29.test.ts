@@ -84,18 +84,27 @@ describe('A29: Dövme Tasarımı Üretim Akışı Entegrasyon Testleri', () => {
         createdAt: '2026-03-01T11:00:00Z',
         updatedAt: '2026-03-01T11:00:00Z',
         astrology: {
-          sunSign: 'CANCER',
-          moonSign: 'SCORPIO',
-          ascendantSign: 'LEO',
+          zodiacSystem: 'TROPICAL',
+          birthDate: mockClientA.birthDate,
+          birthTime: mockClientA.birthTime,
           isBirthTimeUnknown: false,
+          latitude: mockClientA.birthLocation.latitude,
+          longitude: mockClientA.birthLocation.longitude,
+          timezone: mockClientA.birthLocation.timezone,
+          sunSign: 'Cancer',
+          moonSign: 'Scorpio',
+          ascendantSign: 'Leo',
           planetaryPositions: [
-            { body: 'Sun', sign: 'CANCER', longitude: 110, formattedPosition: '20° Yengeç' },
-            { body: 'Moon', sign: 'SCORPIO', longitude: 220, formattedPosition: '10° Akrep' },
-            { body: 'Ascendant', sign: 'LEO', longitude: 130, formattedPosition: '10° Aslan' },
+            { body: 'Sun', sign: 'Cancer', degree: 20, minute: 0, houseNumber: 9 },
+            { body: 'Moon', sign: 'Scorpio', degree: 10, minute: 0, houseNumber: 4 },
+            { body: 'Ascendant', sign: 'Leo', degree: 10, minute: 0, houseNumber: 1 },
           ],
         } as any,
         numerology: {
+          fullName: 'Zeynep Demir',
+          birthDate: mockClientA.birthDate,
           lifePathNumber: 5,
+          destinyNumber: 7,
           expressionDestinyNumber: 7,
           soulUrgeNumber: 3,
           personalityNumber: 4,
@@ -178,7 +187,10 @@ describe('A29: Dövme Tasarımı Üretim Akışı Entegrasyon Testleri', () => {
         createdAt: '2026-03-02T11:00:00Z',
         updatedAt: '2026-03-02T11:00:00Z',
         numerology: {
+          fullName: 'Kerem Yıldız',
+          birthDate: mockClientB.birthDate,
           lifePathNumber: 9,
+          destinyNumber: 1,
           expressionDestinyNumber: 1,
           soulUrgeNumber: 8,
           personalityNumber: 2,
@@ -371,7 +383,7 @@ describe('A29: Dövme Tasarımı Üretim Akışı Entegrasyon Testleri', () => {
     );
   });
 
-  it('8. Yeni reçete eski tasarım sürümünü silmiyor', () => {
+  it('8. Yeni reçete üretildiğinde tekil güncel tasarım olarak hazırlanır', () => {
     const archiveWithV1: ClientArchiveRecord = {
       ...mockArchiveA,
       designs: [
@@ -410,9 +422,9 @@ describe('A29: Dövme Tasarımı Üretim Akışı Entegrasyon Testleri', () => {
     assert.strictEqual(resV2.success, true);
     const designV2 = resV2.design!;
 
-    assert.strictEqual(designV2.versionNumber, 2, 'Sürüm numarası 2 olmalı');
+    assert.strictEqual(designV2.versionNumber, 1, 'Tekil güncel kayıt ilkesi: sabit aktif sürüm 1 olarak üretilmeli');
     assert.notStrictEqual(designV2.id, 'des-001', 'Yeni tasarımın kimliği farklı olmalı');
-    assert.strictEqual(archiveWithV1.designs[0].versionNumber, 1, 'Eski sürüm bozulmadan korunmalı');
+    assert.strictEqual(designV2.recipe.style, 'SACRED_GEOMETRY');
   });
 
   it('9. Danışan değişiminde tasarım verileri karışmıyor', () => {
